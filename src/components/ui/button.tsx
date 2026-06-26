@@ -9,7 +9,7 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "border-transparent bg-gradient-to-r from-accent-bright to-accent text-white hover:from-[#ff6a60] hover:to-accent-hover active:from-accent active:to-accent-active",
+          "border-transparent bg-gradient-to-r from-accent-bright to-accent text-black hover:from-[#6dffc0] hover:to-accent-hover active:from-accent active:to-accent-active",
         outline:
           "border-border bg-glass text-fg backdrop-blur-sm hover:border-border-strong hover:bg-panel-raised",
         ghost:

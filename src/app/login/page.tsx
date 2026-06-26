@@ -39,7 +39,7 @@ export default function LoginPage() {
             {devBypass ? (
               <button
                 type="submit"
-                className="flex w-full items-center justify-center rounded-md border border-transparent bg-gradient-to-r from-accent-bright to-accent px-3 py-2.5 text-[13px] font-semibold text-white transition-colors hover:from-[#ff6a60] hover:to-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-ring)]"
+                className="flex w-full items-center justify-center rounded-md border border-transparent bg-gradient-to-r from-accent-bright to-accent px-3 py-2.5 text-[13px] font-semibold text-black transition-colors hover:from-[#6dffc0] hover:to-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-ring)]"
               >
                 Continue as Dev ({process.env.AUTH_DEV_ROLE ?? "Admin"})
               </button>
