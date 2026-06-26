@@ -73,6 +73,33 @@ const config: Config = {
       backdropBlur: {
         glass: "14px",
       },
+      transitionTimingFunction: {
+        "out-expo": "cubic-bezier(0.22, 1, 0.36, 1)",
+      },
+      transitionDuration: {
+        press: "120ms",
+        surface: "150ms",
+        panel: "280ms",
+      },
+      keyframes: {
+        "backdrop-in": {
+          from: { opacity: "0" },
+          to: { opacity: "1" },
+        },
+        "drawer-in": {
+          from: { transform: "translateX(16px)", opacity: "0" },
+          to: { transform: "translateX(0)", opacity: "1" },
+        },
+        "fade-up-in": {
+          from: { opacity: "0", transform: "translateY(4px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
+        },
+      },
+      animation: {
+        "backdrop-in": "backdrop-in 200ms ease-out forwards",
+        "drawer-in": "drawer-in 280ms cubic-bezier(0.22, 1, 0.36, 1) forwards",
+        "fade-up-in": "fade-up-in 220ms cubic-bezier(0.22, 1, 0.36, 1) forwards",
+      },
     },
   },
   plugins: [],

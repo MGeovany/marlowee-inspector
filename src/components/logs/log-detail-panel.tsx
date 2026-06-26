@@ -100,13 +100,13 @@ export function LogDetailPanel({
     <div className="fixed inset-0 z-50 flex">
       <div
         aria-hidden
-        className="detail-drawer-backdrop absolute inset-0"
+        className="detail-drawer-backdrop absolute inset-0 animate-backdrop-in"
         onClick={onClose}
       />
       <aside
         role="dialog"
         aria-modal="true"
-        className="detail-drawer relative ml-auto flex w-full max-w-[480px] flex-col"
+        className="detail-drawer relative ml-auto flex w-full max-w-[480px] animate-drawer-in flex-col"
       >
         <header className="shrink-0 border-b border-border px-4 py-3">
           <div className="flex items-start justify-between gap-3">
@@ -133,7 +133,7 @@ export function LogDetailPanel({
               type="button"
               onClick={onClose}
               aria-label="Close detail panel"
-              className="rounded-sm border border-transparent p-1 text-fg-subtle hover:border-border hover:bg-sidebar-hover hover:text-fg"
+              className="motion-press rounded-sm border border-transparent p-1 text-fg-subtle hover:border-border hover:bg-sidebar-hover hover:text-fg"
             >
               <X className="h-3.5 w-3.5" />
             </button>
@@ -420,7 +420,7 @@ function CopyBtn({ label, onClick }: { label: string; onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex items-center gap-1 rounded-sm border border-border bg-panel px-2 py-1 text-[10px] font-medium uppercase tracking-[0.04em] text-fg-muted hover:bg-panel-raised hover:text-fg"
+      className="motion-press inline-flex items-center gap-1 rounded-sm border border-border bg-panel px-2 py-1 text-[10px] font-medium uppercase tracking-[0.04em] text-fg-muted hover:bg-panel-raised hover:text-fg"
     >
       <Copy className="h-3 w-3" />
       {label}

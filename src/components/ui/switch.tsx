@@ -22,7 +22,7 @@ export function Switch({ checked, onCheckedChange, id, disabled, className }: Sw
       disabled={disabled}
       onClick={() => onCheckedChange(!checked)}
       className={cn(
-        "relative inline-flex h-[18px] w-[30px] shrink-0 items-center rounded-full border transition-colors",
+        "motion-surface relative inline-flex h-[18px] w-[30px] shrink-0 items-center rounded-full border",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-ring)] focus-visible:ring-offset-1 focus-visible:ring-offset-bg",
         "disabled:cursor-not-allowed disabled:opacity-35",
         checked
@@ -33,7 +33,7 @@ export function Switch({ checked, onCheckedChange, id, disabled, className }: Sw
     >
       <span
         className={cn(
-          "inline-block h-3 w-3 transform rounded-full bg-white transition-transform",
+          "inline-block h-3 w-3 transform rounded-full bg-white transition-transform duration-200 ease-out-expo",
           checked ? "translate-x-[14px]" : "translate-x-[3px]",
         )}
       />

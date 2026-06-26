@@ -39,6 +39,10 @@
     --radius-md: 12px;
     --radius-lg: 18px;
     --radius-xl: 22px;
+    --motion-fast: 120ms;
+    --motion-base: 150ms;
+    --motion-panel: 280ms;
+    --motion-ease: cubic-bezier(0.22, 1, 0.36, 1);
   }
 
   html {
@@ -170,7 +174,21 @@
 
   /* Chips (Rivalo period picker style) */
   .chip {
-    @apply inline-flex cursor-pointer select-none items-center rounded-full border border-transparent px-3 py-1 text-[11px] text-fg-subtle transition-colors hover:bg-glass hover:text-fg;
+    @apply inline-flex cursor-pointer select-none items-center rounded-full border border-transparent px-3 py-1 text-[11px] text-fg-subtle;
+    transition:
+      transform var(--motion-fast) var(--motion-ease),
+      background-color var(--motion-base) ease-out,
+      border-color var(--motion-base) ease-out,
+      color var(--motion-base) ease-out,
+      box-shadow var(--motion-base) ease-out;
+  }
+
+  .chip:hover {
+    @apply bg-glass text-fg;
+  }
+
+  .chip:active {
+    transform: scale(0.96);
   }
 
   .chip-active {
@@ -248,7 +266,17 @@
   }
 
   .obs-row {
-    @apply transition-colors hover:bg-glass;
+    transition:
+      background-color var(--motion-base) ease-out,
+      border-color var(--motion-base) ease-out;
+  }
+
+  .obs-row:hover {
+    @apply bg-glass;
+  }
+
+  .obs-row:active {
+    background: var(--glass-strong);
   }
 
   .obs-row-selected {
@@ -305,6 +333,9 @@
   .query-bar {
     @apply flex items-center gap-2 rounded-[var(--radius-md)] border border-border-strong bg-panel-raised px-3 py-2 backdrop-blur-sm;
     box-shadow: 0 0 0 1px rgba(0, 217, 115, 0.06), 0 10px 28px rgba(0, 0, 0, 0.22);
+    transition:
+      border-color 200ms ease-out,
+      box-shadow 200ms ease-out;
   }
 
   .query-bar:focus-within {
@@ -313,7 +344,19 @@
   }
 
   .facet-row {
-    @apply flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[12px] transition-colors hover:bg-glass;
+    @apply flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[12px];
+    transition:
+      background-color var(--motion-base) ease-out,
+      color var(--motion-base) ease-out,
+      transform var(--motion-fast) var(--motion-ease);
+  }
+
+  .facet-row:hover {
+    @apply bg-glass;
+  }
+
+  .facet-row:active {
+    transform: scale(0.98);
   }
 
   .facet-row-active {
@@ -352,7 +395,16 @@
   }
 
   .sidebar-nav-item {
-    @apply relative flex w-full items-center gap-2.5 rounded-xl px-2 py-1.5 text-left transition-all duration-200;
+    @apply relative flex w-full items-center gap-2.5 rounded-xl px-2 py-1.5 text-left;
+    transition:
+      transform var(--motion-fast) var(--motion-ease),
+      background-color 200ms ease-out,
+      border-color 200ms ease-out,
+      box-shadow 200ms ease-out;
+  }
+
+  .sidebar-nav-item:active {
+    transform: scale(0.98);
   }
 
   .sidebar-nav-item:hover:not(.sidebar-nav-item-active) {
@@ -373,7 +425,12 @@
   }
 
   .sidebar-nav-icon {
-    @apply flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-colors;
+    @apply flex h-7 w-7 shrink-0 items-center justify-center rounded-lg;
+    transition:
+      background var(--motion-base) ease-out,
+      color var(--motion-base) ease-out,
+      box-shadow var(--motion-base) ease-out,
+      transform var(--motion-fast) var(--motion-ease);
   }
 
   .sidebar-nav-icon-active {
@@ -387,7 +444,15 @@
   }
 
   .sidebar-service-row {
-    @apply flex items-start gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors;
+    @apply flex items-start gap-2.5 rounded-lg px-2.5 py-2 text-left;
+    transition:
+      background-color var(--motion-base) ease-out,
+      box-shadow var(--motion-base) ease-out,
+      transform var(--motion-fast) var(--motion-ease);
+  }
+
+  .sidebar-service-row:active {
+    transform: scale(0.98);
   }
 
   .sidebar-service-row:hover {
@@ -414,5 +479,40 @@
 
   .dd-page-title {
     @apply font-heading text-[16px] font-semibold text-fg;
+  }
+}
+
+@layer utilities {
+  .motion-press {
+    transition-property: transform, background-color, border-color, box-shadow, color, opacity;
+    transition-duration: var(--motion-base);
+    transition-timing-function: var(--motion-ease);
+  }
+
+  .motion-press:active:not(:disabled) {
+    transform: scale(0.97);
+  }
+
+  .motion-surface {
+    transition-property: background-color, border-color, box-shadow, color;
+    transition-duration: var(--motion-base);
+    transition-timing-function: ease-out;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chip:active,
+  .facet-row:active,
+  .sidebar-nav-item:active,
+  .sidebar-service-row:active,
+  .motion-press:active:not(:disabled),
+  .obs-row:active {
+    transform: none;
+  }
+
+  .animate-backdrop-in,
+  .animate-drawer-in,
+  .animate-fade-up-in {
+    animation: none !important;
   }
 }

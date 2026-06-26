@@ -118,7 +118,7 @@ export function LogsSidebar({ userEmail, role, signOutAction }: LogsSidebarProps
             <button
               type="submit"
               aria-label="Sign out"
-              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-fg-subtle transition-colors hover:bg-glass hover:text-fg"
+              className="motion-press flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-fg-subtle hover:bg-glass hover:text-fg"
             >
               <LogOut className="h-3.5 w-3.5" />
             </button>
