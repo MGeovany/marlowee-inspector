@@ -1,11 +1,10 @@
 /**
  * Shared domain types for the log viewer. These are the shapes the API returns
  * and the UI consumes; they are deliberately decoupled from the Azure SDK row
- * shape (see lib/log-analytics.ts) so the mock phase and the real phase agree.
+ * shape (see lib/log-analytics.ts).
  */
 
 // ERROR/WARN/INFO/LOG are what the Azure level detection emits (see lib/queries.ts).
-// DEBUG is retained for the local mock dataset.
 export type LogLevel = "ERROR" | "WARN" | "INFO" | "LOG" | "DEBUG";
 
 export type ContainerApp = "ca-data-api" | "ca-dashboard" | "ca-onboarding" | "ca-admin";
@@ -41,8 +40,17 @@ export interface LogsResponse {
   total: number;
   range: TimeRange;
   masked: boolean;
-  source: "mock" | "azure";
+  source: "azure";
   timeWindow?: { since?: string; until?: string } | null;
+}
+
+/** Error pattern aggregate from Azure KQL (summary query). */
+export interface ErrorPatternSummary {
+  key: string;
+  label: string;
+  app: ContainerApp;
+  count: number;
+  sample: LogEntry;
 }
 
 export interface LogsSummaryResponse {
@@ -54,6 +62,9 @@ export interface LogsSummaryResponse {
   mostNoisyAppCount: number;
   latestError: LogEntry | null;
   latestWarning: LogEntry | null;
+  latestErrors: LogEntry[];
+  errorPatterns: ErrorPatternSummary[];
+  recentActivity: LogEntry[];
   errorsByApp: Partial<Record<ContainerApp, number>>;
   logsByLevel: Partial<Record<LogLevel, number>>;
   lastLogTimestamp: string | null;

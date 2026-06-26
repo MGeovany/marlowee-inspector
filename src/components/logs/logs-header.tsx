@@ -14,7 +14,6 @@ interface LogsHeaderProps {
   onLiveToggle: () => void;
   onRefresh: () => void;
   loading: boolean;
-  source: "mock" | "azure";
   masked: boolean;
   testSession?: TestSession | null;
 }
@@ -25,7 +24,6 @@ export function LogsHeader({
   onLiveToggle,
   onRefresh,
   loading,
-  source,
   masked,
   testSession,
 }: LogsHeaderProps) {
@@ -48,7 +46,6 @@ export function LogsHeader({
               Session · {testSession.status === "active" ? "live" : "stopped"}
             </Badge>
           )}
-          {source === "mock" && <Badge variant="warn">mock</Badge>}
           {masked && <Badge variant="neutral">MASKED</Badge>}
           <Button
             variant={live ? "live" : "outline"}

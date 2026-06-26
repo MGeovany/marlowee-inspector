@@ -3,9 +3,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
-  computeSidePanel,
   filterLogRows,
   relatedLogs,
+  summaryToSidePanel,
 } from "@/lib/log-stats";
 import {
   type ContainerApp,
@@ -93,7 +93,6 @@ export function LogsView({
   const [status, setStatus] = useState<LogsStatus>("idle");
   const [allRows, setAllRows] = useState<LogEntry[]>([]);
   const [masked, setMasked] = useState(true);
-  const [source, setSource] = useState<"mock" | "azure">("azure");
   const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [summary, setSummary] = useState<LogsSummaryResponse | null>(null);
@@ -185,7 +184,6 @@ export function LogsView({
 
       setAllRows(merged);
       setMasked(responses[0]?.masked ?? true);
-      setSource(responses[0]?.source ?? "azure");
       setLastRefresh(new Date());
       setError(null);
       setStatus("success");
@@ -236,7 +234,7 @@ export function LogsView({
     [visibleRows, selectedApp, search, level, stream],
   );
 
-  const sidePanel = useMemo(() => computeSidePanel(visibleRows), [visibleRows]);
+  const sidePanel = useMemo(() => summaryToSidePanel(summary), [summary]);
   const resolvedIssues = useMemo(
     () => collectManagedIssues(allRows, issueStore, ["resolved"]),
     [allRows, issueStore],
@@ -332,7 +330,6 @@ export function LogsView({
           onLiveToggle={() => setLive((v) => !v)}
           onRefresh={() => setNonce((n) => n + 1)}
           loading={status === "loading"}
-          source={source}
           masked={masked}
           testSession={testSession}
         />

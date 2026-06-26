@@ -9,7 +9,7 @@ import { effectiveQueryRange, logsPerMinute } from "@/lib/query-time";
 import { ALLOWED_APPS, buildLogsSummaryQuery } from "@/lib/queries";
 import { rateLimit } from "@/lib/rate-limit";
 import { audit } from "@/lib/audit";
-import { TIME_RANGE_MS, type ContainerApp, type LogEntry, type LogLevel, type LogsSummaryResponse } from "@/lib/types";
+import { TIME_RANGE_MS, type ContainerApp, type LogEntry, type LogLevel, type LogsSummaryResponse, type ErrorPatternSummary } from "@/lib/types";
 
 const QuerySchema = z.object({
   app: z.enum(ALLOWED_APPS).optional(),
@@ -144,6 +144,9 @@ function normalizeSummaryTable(
   let latestError: LogEntry | null = null;
   let latestWarning: LogEntry | null = null;
   let lastLogTimestamp: string | null = null;
+  const latestErrors: LogEntry[] = [];
+  const errorPatterns: ErrorPatternSummary[] = [];
+  const recentActivity: LogEntry[] = [];
 
   for (const row of rows) {
     const kind = cell(row, columns.kind);
@@ -175,7 +178,28 @@ function normalizeSummaryTable(
 
     if (kind === "latestError") latestError = logEntryFromRow(row, columns, "latest-error");
     if (kind === "latestWarning") latestWarning = logEntryFromRow(row, columns, "latest-warning");
+
+    if (kind === "latestErrorRow") {
+      const entry = logEntryFromRow(row, columns, key || "latest-error-row");
+      if (entry) latestErrors.push(entry);
+      continue;
+    }
+
+    if (kind === "recentActivity") {
+      const entry = logEntryFromRow(row, columns, key || "recent-activity");
+      if (entry) recentActivity.push(entry);
+      continue;
+    }
+
+    if (kind === "errorPattern") {
+      const pattern = errorPatternFromRow(row, columns, key);
+      if (pattern) errorPatterns.push(pattern);
+    }
   }
+
+  latestErrors.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+  recentActivity.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+  errorPatterns.sort((a, b) => b.count - a.count);
 
   return {
     totalLogs,
@@ -188,6 +212,9 @@ function normalizeSummaryTable(
     mostNoisyAppCount,
     latestError,
     latestWarning,
+    latestErrors,
+    errorPatterns,
+    recentActivity,
     errorsByApp,
     logsByLevel,
     lastLogTimestamp,
@@ -195,6 +222,26 @@ function normalizeSummaryTable(
     timeRange,
     source: "azure",
     timeWindow: timeWindow ?? null,
+  };
+}
+
+function errorPatternFromRow(
+  row: unknown[],
+  columns: Record<string, number>,
+  key: string,
+): ErrorPatternSummary | null {
+  const sample = logEntryFromRow(row, columns, key || "error-pattern");
+  if (!sample) return null;
+
+  const separator = key.indexOf("|");
+  const label = separator >= 0 ? key.slice(separator + 1) : sample.message.split("\n")[0].slice(0, 56);
+
+  return {
+    key: key || `${sample.app}:${label}`,
+    label,
+    app: sample.app,
+    count: numberCell(row, columns.count),
+    sample,
   };
 }
 

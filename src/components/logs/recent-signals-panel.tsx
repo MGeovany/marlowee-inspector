@@ -1,11 +1,11 @@
 "use client";
 
 import { formatDistanceToNow } from "date-fns";
-import { Minus, TrendingDown, TrendingUp } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import type { HiddenLogSummary, IssueNote, ManagedIssueSummary } from "@/lib/issues";
-import type { DetectedError, LatestIncident, SidePanelData } from "@/lib/log-stats";
+import type { SidePanelData } from "@/lib/log-stats";
+import type { ErrorPatternSummary } from "@/lib/types";
 import type { LogEntry, LogLevel } from "@/lib/types";
 
 interface RecentSignalsPanelProps {
@@ -40,33 +40,34 @@ export function RecentSignalsPanel({
       <div className="border-b border-border px-3 py-2.5">
         <p className="section-label">Watchdog</p>
         <p className="mt-0.5 text-[12px] font-medium text-fg">Recent signals</p>
+        <p className="mt-1 font-mono text-[10px] text-fg-subtle">Azure Log Analytics · selected window</p>
       </div>
 
       <div className="flex-1 space-y-2.5 overflow-y-auto p-2.5">
-        <SectionCard title="Latest incidents">
-          {data.latestIncidents.length === 0 ? (
-            <EmptyLine message="No active incidents" />
+        <SectionCard title="Latest errors">
+          {data.latestErrors.length === 0 ? (
+            <EmptyLine message="No errors in this window" />
           ) : (
             <div className="space-y-1.5">
-              {data.latestIncidents.map((inc) => (
-                <IncidentCard
-                  key={inc.id}
-                  incident={inc}
-                  active={selectedId === inc.sample.id}
-                  onClick={() => onSelectLog(inc.sample)}
+              {data.latestErrors.map((entry) => (
+                <LogSignalCard
+                  key={entry.id}
+                  entry={entry}
+                  active={selectedId === entry.id}
+                  onClick={() => onSelectLog(entry)}
                 />
               ))}
             </div>
           )}
         </SectionCard>
 
-        <SectionCard title="Detected errors">
-          {data.detectedErrors.length === 0 ? (
+        <SectionCard title="Error patterns">
+          {data.errorPatterns.length === 0 ? (
             <EmptyLine message="No error patterns" />
           ) : (
             <div className="space-y-1.5">
-              {data.detectedErrors.map((item) => (
-                <DetectedErrorCard
+              {data.errorPatterns.map((item) => (
+                <ErrorPatternCard
                   key={item.key}
                   item={item}
                   active={selectedId === item.sample.id}
@@ -83,7 +84,7 @@ export function RecentSignalsPanel({
           ) : (
             <div className="space-y-1.5">
               {data.recentActivity.map((entry) => (
-                <ActivityCard
+                <LogSignalCard
                   key={entry.id}
                   entry={entry}
                   active={selectedId === entry.id}
@@ -167,87 +168,7 @@ function SectionCard({ title, children }: { title: string; children: React.React
   );
 }
 
-function IncidentCard({
-  incident,
-  active,
-  onClick,
-}: {
-  incident: LatestIncident;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "w-full rounded-sm border px-2.5 py-2 text-left transition-colors",
-        active
-          ? "border-accent bg-accent-soft"
-          : "border-border bg-glass backdrop-blur-sm hover:border-border-strong hover:bg-panel-raised",
-      )}
-    >
-      <div className="mb-1.5 flex items-center gap-1.5">
-        <span
-          className={cn(
-            "rounded-sm px-1 py-0.5 font-mono text-[9px] font-bold",
-            incident.severity === "SEV-2"
-              ? "bg-[rgba(253,126,20,0.15)] text-level-warn"
-              : "bg-[rgba(250,178,7,0.12)] text-[var(--yellow)]",
-          )}
-        >
-          {incident.severity}
-        </span>
-        <span className="font-mono text-[9px] uppercase tracking-[0.04em] text-fg-subtle">
-          {incident.status}
-        </span>
-      </div>
-      <p className="truncate font-mono text-[11px] font-medium text-fg">{incident.title}</p>
-      <p className="mt-1 flex items-center justify-between gap-2 font-mono text-[10px] text-fg-subtle">
-        <span className="truncate">{incident.app}</span>
-        <span className="shrink-0 tabular-nums">
-          {formatDistanceToNow(new Date(incident.sample.timestamp), { addSuffix: true })}
-        </span>
-      </p>
-    </button>
-  );
-}
-
-function DetectedErrorCard({
-  item,
-  active,
-  onClick,
-}: {
-  item: DetectedError;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "flex w-full items-start gap-2 rounded-sm border px-2.5 py-2 text-left transition-colors",
-        active
-          ? "border-accent bg-accent-soft"
-          : "border-border bg-glass backdrop-blur-sm hover:border-border-strong hover:bg-panel-raised",
-      )}
-    >
-      <div className="min-w-0 flex-1">
-        <p className="truncate font-mono text-[11px] font-medium text-fg">{item.label}</p>
-        <p className="mt-0.5 font-mono text-[10px] text-fg-subtle">{item.app}</p>
-      </div>
-      <div className="flex shrink-0 items-center gap-1.5 pt-0.5">
-        <TrendIcon trend={item.trend} />
-        <span className="min-w-[20px] text-right font-mono text-[11px] font-semibold tabular-nums text-level-error">
-          {item.count}
-        </span>
-      </div>
-    </button>
-  );
-}
-
-function ActivityCard({
+function LogSignalCard({
   entry,
   active,
   onClick,
@@ -271,9 +192,41 @@ function ActivityCard({
       <div className="min-w-0 flex-1">
         <p className="truncate font-mono text-[11px] text-fg">{entry.message}</p>
         <p className="mt-0.5 font-mono text-[10px] text-fg-subtle">
-          {entry.app} · {formatDistanceToNow(new Date(entry.timestamp), { addSuffix: true })}
+          {entry.app} · {entry.level} ·{" "}
+          {formatDistanceToNow(new Date(entry.timestamp), { addSuffix: true })}
         </p>
       </div>
+    </button>
+  );
+}
+
+function ErrorPatternCard({
+  item,
+  active,
+  onClick,
+}: {
+  item: ErrorPatternSummary;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "flex w-full items-start gap-2 rounded-sm border px-2.5 py-2 text-left transition-colors",
+        active
+          ? "border-accent bg-accent-soft"
+          : "border-border bg-glass backdrop-blur-sm hover:border-border-strong hover:bg-panel-raised",
+      )}
+    >
+      <div className="min-w-0 flex-1">
+        <p className="truncate font-mono text-[11px] font-medium text-fg">{item.label}</p>
+        <p className="mt-0.5 font-mono text-[10px] text-fg-subtle">{item.app}</p>
+      </div>
+      <span className="min-w-[20px] shrink-0 pt-0.5 text-right font-mono text-[11px] font-semibold tabular-nums text-level-error">
+        {item.count}
+      </span>
     </button>
   );
 }
@@ -329,12 +282,6 @@ function NoteHistoryCard({ note }: { note: IssueNote }) {
       <p className="line-clamp-3 font-mono text-[10px] leading-relaxed text-fg-muted">{note.text}</p>
     </div>
   );
-}
-
-function TrendIcon({ trend }: { trend: DetectedError["trend"] }) {
-  if (trend === "up") return <TrendingUp className="h-3 w-3 text-level-error" />;
-  if (trend === "down") return <TrendingDown className="h-3 w-3 text-level-warn" />;
-  return <Minus className="h-3 w-3 text-fg-subtle" />;
 }
 
 function EmptyLine({ message }: { message: string }) {

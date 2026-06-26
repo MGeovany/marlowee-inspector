@@ -70,7 +70,7 @@ Browser (employee)
   (same env as the apps it reads). Local dev runs against the workspace using your `az login`
   credential.
 - **Stateless MVP:** no database required to start. Audit + rate-limit use stdout + in-memory
-  (documented upgrade path to Redis/Postgres in §6).
+  (upgrade path to Redis/Postgres documented in `docs/V2_TASKS.md`).
 
 **Request lifecycle of a search**
 
@@ -223,174 +223,18 @@ Time range is an enum (`1h | 24h | 7d`) mapped to SDK `Durations`, never a raw u
 
 ---
 
-## 6. Persistence layer
-
-Como ahora hay notas, resolved, suppressed, hidden y test sessions, ya no basta con app stateless.
-Propuesta: **SQLite (dev) + Postgres (prod) vía Drizzle ORM**.
-
-Drizzle permite un solo schema que compila a ambos dialectos, y es trivial migrar después si se necesita Azure SQL / Cosmos.
-
-| Capa | Local dev | Producción |
-|------|-----------|------------|
-| Driver | `better-sqlite3` | `@neondatabase/serverless` o `pg` con pooled conexiones |
-| DB archivo | `./data/marlowee.db` | Postgres en Neon / Supabase / Azure Flexible Server |
-| ORM | `drizzle-orm` | mismo |
-
-**Por qué no Supabase directamente**: ya usan next-auth con Azure AD; añadir Supabase Auth duplica identidad. Prefiero Postgres plano sin lock-in.
-
-**Por qué no Azure-native directo**: Cosmos DB es caro para 5 tablitas; Table Storage no soporta joins, ordenamiento flexible ni queries tipo "notes for issue". Postgres resuelve todo.
-
-### Alternativas Azure-native evaluadas
-
-| Opción | Veredicto |
-|--------|-----------|
-| **Cosmos DB NoSQL** | Overkill para 5 tablas; latency extra; sin joins |
-| **Azure Table Storage** | Barato pero sin ordenamiento, sin joins, sin tipos |
-| **Azure SQL Database** | Bien, pero mínimo ~$5/mes + configuración extra |
-| **Log Analytics custom tables** | Solo append, no soporta updates (no se puede cambiar status de issue) |
-
-Ninguna ofrece la simplicidad de `SQLite en dev → Postgres en prod` con el mismo schema Drizzle.
-
-### Schema Drizzle (`src/lib/db/schema.ts`)
-
-```ts
-import { sqliteTable, pgTable } from "drizzle-orm/...";
-import { sql } from "drizzle-orm";
-
-const timestamps = {
-  createdAt: text("created_at").notNull().default(sql`(current_timestamp)`),
-  updatedAt: text("updated_at").notNull().default(sql`(current_timestamp)`),
-};
-
-// 1. Test sessions
-export const testSessions = (isPg ? pgTable : sqliteTable)("test_sessions", {
-  id: text("id").primaryKey(),
-  name: text("name").notNull(),
-  status: text("status", { enum: ["active", "stopped"] }).notNull().default("active"),
-  startedAt: text("started_at").notNull(),
-  stoppedAt: text("stopped_at"),
-  ...timestamps,
-});
-
-// 2. Issue fingerprints
-export const issueFingerprints = (isPg ? pgTable : sqliteTable)("issue_fingerprints", {
-  fingerprint: text("fingerprint").primaryKey(),
-  status: text("status", {
-    enum: ["open", "investigating", "resolved", "suppressed", "hidden"],
-  }).notNull().default("open"),
-  app: text("app").notNull(),
-  level: text("level").notNull(),
-  label: text("label").notNull(),
-  endpoint: text("endpoint"),
-  statusCode: integer("status_code"),
-  ...timestamps,
-});
-
-// 3. Log annotations (notes)
-export const logAnnotations = (isPg ? pgTable : sqliteTable)("log_annotations", {
-  id: text("id").primaryKey(),
-  target: text("target", { enum: ["log", "issue"] }).notNull(),
-  targetId: text("target_id").notNull(),
-  fingerprint: text("fingerprint").notNull().references(() => issueFingerprints.fingerprint),
-  logId: text("log_id"),
-  text: text("text").notNull(),
-  author: text("author"),
-  ...timestamps,
-});
-
-// 4. Suppress rules
-export const suppressRules = (isPg ? pgTable : sqliteTable)("suppress_rules", {
-  id: text("id").primaryKey(),
-  pattern: text("pattern").notNull(),
-  app: text("app"),
-  level: text("level"),
-  endpoint: text("endpoint"),
-  reason: text("reason"),
-  createdBy: text("created_by"),
-  ...timestamps,
-});
-
-// 5. Audit events
-export const auditEvents = (isPg ? pgTable : sqliteTable)("audit_events", {
-  id: text("id").primaryKey(),
-  type: text("type", {
-    enum: ["search", "raw_search", "rate_limited", "denied", "note_added",
-           "issue_status_changed", "suppress_rule_created", "test_session_started",
-           "test_session_stopped"],
-  }).notNull(),
-  actor: text("actor"),
-  oid: text("oid"),
-  role: text("role"),
-  app: text("app"),
-  search: text("search"),
-  rowCount: integer("row_count"),
-  details: text("details"),
-  ...timestamps,
-});
-```
-
-### Implementación
-
-**Nuevos módulos**:
-
-| Archivo | Propósito |
-|---------|-----------|
-| `src/lib/db/schema.ts` | Drizzle schema (compartido SQLite/Postgres) |
-| `src/lib/db/client.ts` | `createClient()` — devuelve SQLite o Postgres según `NODE_ENV` o `DATABASE_URL` |
-| `src/lib/db/migrate.ts` | Script `drizzle-kit push` para dev, migraciones versionadas para prod |
-| `src/lib/db/repository.ts` | Funciones tipo `saveIssue`, `loadIssues`, `addAnnotation`, `queryAudit` — reemplazan `loadIssueStore/saveIssueStore` |
-
-**Migración desde localStorage**: script `src/scripts/migrate-local-to-db.ts` que lee `localStorage` (vía Node si hay dump JSON) y escribe en SQLite.
-
-**Eliminación progresiva**:
-1. Crear repositorio + schema + fixture data en SQLite
-2. Migrar `logs-view.tsx` de llamar `loadIssueStore/saveIssueStore` a llamar `fetch('/api/issues') + POST/PUT`
-3. Crear endpoints API REST para cada modelo:
-   - `GET/POST /api/issues` — listar/crear issue fingerprints
-   - `PATCH /api/issues/:fingerprint` — cambiar status
-   - `GET/POST /api/annotations` — notas
-   - `GET/POST /api/sessions` — test sessions
-   - `GET /api/audit` — solo Admin
-4. Una vez endpoints listos, eliminar `loadIssueStore/saveIssueStore` y llaves de localStorage
-
-**Dependencias a añadir**:
-```
-pnpm add drizzle-orm better-sqlite3 @neondatabase/serverless
-pnpm add -D drizzle-kit @types/better-sqlite3
-```
-
-### Plan de ejecución
-
-1. `pnpm add drizzle-orm better-sqlite3` + `pnpm add -D drizzle-kit @types/better-sqlite3`
-2. Crear `src/lib/db/schema.ts` con las 5 tablas
-3. Crear `src/lib/db/client.ts` con switch automático
-4. `npx drizzle-kit push` para generar SQLite local en `./data/marlowee.db`
-5. Migrar `issues.ts` a `repository.ts` — funciones con Drizzle queries
-6. Crear endpoints REST (`/api/issues/*`, `/api/annotations/*`, `/api/sessions/*`)
-7. Migrar `logs-view.tsx` a usar endpoints
-8. Eliminar localStorage persistence
-9. Agregar `DATABASE_URL` env var para Postgres en producción
-
-### Costo estimado MVP
-
-- SQLite dev: $0
-- Postgres (Neon free tier): 0.5GB, 10 proyectos — suficiente para meses
-- Alternativa Azure: Azure Database for PostgreSQL Flexible Server ~$6/mes (Burstable B1ms)
-
----
-
-## 7. Security
+## 6. Security
 
 ### Principios
 
 - **Zero trust al frontend**: el navegador nunca recibe Azure credentials, connection strings ni tokens de base de datos. Todo acceso a datos pasa por Next.js API Routes (server-side).
 - **Masking siempre server-side**: `src/lib/masking.ts` se aplica en el API route antes de responder al cliente. No existe flag `raw=true` ni bypass expuesto. El cliente siempre recibe `masked: true`.
-- **Hidden/suppressed no borra logs reales**: opera exclusivamente sobre metadatos en las tablas `issue_fingerprints` y `suppress_rules`. Los logs en Azure Log Analytics son inmutables y nunca se eliminan via Marlowee.
+- **Hidden/suppressed no borra logs reales**: opera sobre metadatos de triage en el cliente (MVP: `localStorage`). Los logs en Azure Log Analytics son inmutables y nunca se eliminan via Marlowee.
 - **Authorization en cada request**: cada API route verifica sesión vía `auth()`, aplica `capabilitiesFor()` y `canReadApp()` antes de ejecutar cualquier query o mutación.
 
 ### Audit log de acciones
 
-Cada acción del usuario se registra en la tabla `audit_events` (y mirror a stdout JSON para captura en ContainerAppConsoleLogs_CL). Eventos a registrar:
+Cada acción del usuario se registra en audit stdout JSON (capturable en ContainerAppConsoleLogs_CL). Eventos a registrar:
 
 | Acción | `type` | Contexto adicional |
 |--------|--------|-------------------|
@@ -402,7 +246,6 @@ Cada acción del usuario se registra en la tabla `audit_events` (y mirror a stdo
 | Ocultar log individual | `log_hidden` | logId, fingerprint |
 | Reabrir log | `log_reopened` | logId |
 | Agregar nota | `note_added` | fingerprint, logId, target, charCount |
-| Copiar raw / Copy for AI | `raw_copied` | logId, fingerprint, destination ("clipboard" \| "ai") |
 | Rate limited | `rate_limited` | app |
 | Acceso denegado | `denied` | reason |
 
@@ -412,24 +255,7 @@ Cada acción del usuario se registra en la tabla `audit_events` (y mirror a stdo
 |----------|---------------|-----------------|------------|-------|
 | `GET /api/logs` | Sesión | `canReadApp(app)` | Sí (por rol) | `search` |
 | `GET /api/logs/summary` | Sesión | `canReadApp(app)` | Sí | `search` |
-| `GET /api/logs/metrics` | Sesión | Admin solo | Sí | `search` |
-| `GET/POST /api/issues` | Sesión | `canReadApp(app)` | Sí | `search` / `issue_status_changed` |
-| `PATCH /api/issues/:fingerprint` | Sesión | `canReadApp(app)` | Sí | `issue_status_changed` |
-| `GET/POST /api/annotations` | Sesión | `canReadApp(app)` | Sí | `search` / `note_added` |
-| `GET/POST /api/sessions` | Sesión | Cualquier rol | Sí | `test_session_started/stopped` |
-| `GET /api/audit` | Sesión | Admin solo | Sí | `search` |
-
-### Copy raw / Copy for AI
-
-El cliente no tiene acceso al raw desenmascarado. Cuando el usuario hace clic en "Copy raw" o "Copy for AI":
-
-1. El frontend envía `POST /api/logs/copy` con `{ logId }`
-2. El server ejecuta masking (mismo `maskRows`)
-3. El server registra `audit({ type: "raw_copied", ... })`
-4. El server devuelve el texto ya masked
-5. El frontend copia al portapapeles
-
-Esto asegura que incluso la copia manual pasa por audit y masking.
+| `GET /api/logs/metrics` | Sesión | Apps permitidas por rol | Sí | `search` |
 
 ### Rate limiting
 
@@ -447,104 +273,7 @@ Esto asegura que incluso la copia manual pasa por audit y masking.
 
 ---
 
-## 8. Recommended UI (shadcn/ui, modern minimalist pixel font)
-
-**Stack:** Tailwind CSS + **shadcn/ui** (Radix primitives), dark-first.
-
-**Font direction — "modern minimalist pixel":**
-
-- **Brand / headings / KPIs:** [`Departure Mono`](https://departuremono.com/) — a modern pixel
-  monospace that reads as clean and terminal-like without being retro-noisy. (Self-host the `.woff2`.)
-- **Log body / tables / code:** `Geist Mono` (or `JetBrains Mono`) for maximum readability of long
-  log lines — pixel fonts hurt readability at small sizes, so the pixel face is reserved for chrome,
-  not the log payload.
-- Alternative all-pixel option if you want stronger character: `Pixelify Sans` (Google Fonts) for
-  headings only.
-
-**Layout**
-
-```
-┌───────────────────────────────────────────────────────────────┐
-│  MARLOWEE INSPECTOR · law-savvly-dev-main      Live · Refresh │   ← header
-├───────────────┬───────────────────────────────────────────────┤
-│  App          │  [ Test session bar: name · duration · logs ] │   ← start/stop/clear
-│  ◉ ca-data-api│  [ Total | Errors | Warnings | Logs/min ]    │   ← summary cards (Azure)
-│  ○ ca-dashboard│  [ Search… ] [ Session window | 1h 24h 7d ]  │   ← filters
-│  ○ ca-onboard.│  TIMESTAMP  APP  LEVEL  MESSAGE  …           │   ← log table
-│  ○ ca-admin   │  …                          │ Latest incidents│   ← right signals panel
-│  (role-gated) │                             │ Detected errors │
-└───────────────┴─────────────────────────────┴ Recent activity─┘
-```
-
-**Observability UI (implemented)**
-
-- Dark dev-tool aesthetic (`#1e1e1e` matte palette), Michroma headings + Urbanist body.
-- Left sidebar: app picker with error badges and health dots.
-- Summary cards: totals from `/api/logs/summary` (Azure aggregates).
-- Filter toolbar: search, level chips, stream, time range (or **Session window** when recording).
-- Right panel: stacked cards — Latest incidents, Detected errors, Recent activity.
-- Detail drawer: HTTP/status/latency tiles, masked fields, raw JSON, related logs.
-- **Test session bar** between header and summary cards (see §2).
-
-**Components (shadcn/ui):** `Sidebar`/nav, `Input` (search), `ToggleGroup` (time range),
-`Switch` (errors-only), `Badge` (log level, color-coded), `Table` + TanStack Virtual (log rows),
-`Sheet`/`Dialog` (row detail with full masked payload), `Sonner` (toasts), `Skeleton` (loading),
-`DropdownMenu` (user menu / sign-out), **TestSessionBar** (session controls).
-
-**UX rules**
-
-- Monospace log lines, level color-coded (`ERROR` red, `WARN` amber, `INFO` muted).
-- App switcher only shows apps the user's role may read.
-- Empty state explains the 30-day retention limit (or session-specific hint while recording).
-- A small "masked" indicator on rows so users know redaction is applied (except Admin raw mode).
-- Test sessions never delete Azure data; the UI states this explicitly when starting a session.
-
----
-
-## 9. Required environment variables
-
-See `.env.example`. Summary:
-
-| Variable | Scope | Example / source |
-|---|---|---|
-| `AUTH_SECRET` | server | `openssl rand -base64 32` |
-| `AUTH_URL` | server | `http://localhost:3000` (dev) / `https://<host>` |
-| `AUTH_MICROSOFT_ENTRA_ID_ID` | server | App Registration (client) ID — created later |
-| `AUTH_MICROSOFT_ENTRA_ID_SECRET` | server | App Registration client secret — created later |
-| `AUTH_MICROSOFT_ENTRA_ID_ISSUER` | server | `https://login.microsoftonline.com/cac58ef5-e1ea-4641-9663-a6d848ad392f/v2.0` |
-| `AZURE_TENANT_ID` | server | `cac58ef5-e1ea-4641-9663-a6d848ad392f` |
-| `AZURE_LOG_ANALYTICS_WORKSPACE_ID` | server | `e583009c-5c01-4d42-a46a-3c771e087f5d` |
-| `AZURE_MANAGED_IDENTITY_CLIENT_ID` | server (prod only) | user-assigned MI client id — created later |
-| `ALLOWED_CONTAINER_APPS` | server | `ca-data-api,ca-dashboard,ca-onboarding,ca-admin` |
-| `RATE_LIMIT_PER_MINUTE` | server | `30` |
-
-> No `NEXT_PUBLIC_*` secrets. Everything above is server-only.
-
----
-
-## 10. Recommended libraries
-
-| Concern | Library |
-|---|---|
-| Framework | `next` (App Router) + `react`, `react-dom` |
-| Language | `typescript` |
-| Auth (Entra ID OIDC) | `next-auth@beta` (Auth.js v5), provider `microsoft-entra-id` |
-| Azure log queries | `@azure/monitor-query`, `@azure/identity` |
-| UI | `tailwindcss`, `shadcn/ui` (Radix), `lucide-react`, `class-variance-authority`, `clsx`, `tailwind-merge` |
-| Tables / virtualization | `@tanstack/react-table`, `@tanstack/react-virtual` |
-| Validation | `zod` (validate query params + env) |
-| Toasts | `sonner` |
-| Dates | `date-fns` |
-| Lint/format | `eslint`, `prettier` |
-| ORM | `drizzle-orm` |
-| Database (dev) | `better-sqlite3` |
-| Database (prod) | `@neondatabase/serverless` or `pg` |
-
-Optional later: `ioredis` (distributed rate limit), `@upstash/ratelimit`.
-
----
-
-## 11. Technical risks of the MVP
+## 7. Technical risks of the MVP
 
 1. **30-day retention.** Anything older is gone; not a Marlowee Inspector bug. Surface it in the UI; consider
    archival/export later if support needs more history.

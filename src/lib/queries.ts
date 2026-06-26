@@ -79,6 +79,10 @@ export function metricsBinMinutes(range: TimeRange): number {
 
 const ERROR_TERMS = ["ERROR", "Error", "exception", "Exception", "FATAL", "panic", "stacktrace"];
 
+/** Truncate log message for error-pattern grouping (mirrors KQL in buildLogsSummaryQuery). */
+const KQL_PATTERN_LABEL =
+  'iif(strlen(Message) > 56, strcat(substring(Message, 0, 53), "…"), Message)';
+
 function kqlTimeWindowLines(window?: QueryTimeWindow): string[] {
   if (!window) return [];
   const lines: string[] = [];
@@ -187,7 +191,10 @@ export function buildLogsSummaryQuery(input: BuildSummaryQueryInput): string {
     `  (Base | summarize Count = count() by Level | project Kind = "logsByLevel", Key = Level, Count, TotalLogs = long(null), ErrorsCount = long(null), WarningsCount = long(null), LastLogTimestamp = datetime(null), ${nullLogFields}),`,
     `  (Base | summarize Count = count() by App | top 1 by Count desc | project Kind = "mostNoisyApp", Key = App, Count, TotalLogs = long(null), ErrorsCount = long(null), WarningsCount = long(null), LastLogTimestamp = datetime(null), App = "", Level = "", TimeGenerated = datetime(null), Message = "", Revision = "", Replica = "", Stream = ""),`,
     `  (Base | where Level == "ERROR" | top 1 by TimeGenerated desc | project Kind = "latestError", Key = "", ${nullMetrics}, App, Level, TimeGenerated, Message, Revision, Replica, Stream),`,
-    `  (Base | where Level == "WARN" | top 1 by TimeGenerated desc | project Kind = "latestWarning", Key = "", ${nullMetrics}, App, Level, TimeGenerated, Message, Revision, Replica, Stream)`,
+    `  (Base | where Level == "WARN" | top 1 by TimeGenerated desc | project Kind = "latestWarning", Key = "", ${nullMetrics}, App, Level, TimeGenerated, Message, Revision, Replica, Stream),`,
+    `  (Base | where Level == "ERROR" | extend PatternLabel = ${KQL_PATTERN_LABEL} | summarize Count=count(), TimeGenerated=max(TimeGenerated), Message=take_any(Message), Revision=take_any(Revision), Replica=take_any(Replica), Stream=take_any(Stream), Level=take_any(Level) by App, PatternLabel | top 8 by Count desc | project Kind = "errorPattern", Key=strcat(App, "|", PatternLabel), Count, TotalLogs=long(null), ErrorsCount=long(null), WarningsCount=long(null), LastLogTimestamp=datetime(null), App, Level, TimeGenerated, Message, Revision, Replica, Stream),`,
+    `  (Base | where Level == "ERROR" | top 5 by TimeGenerated desc | project Kind = "latestErrorRow", Key=strcat(App, "|", tostring(TimeGenerated)), Count=long(null), TotalLogs=long(null), ErrorsCount=long(null), WarningsCount=long(null), LastLogTimestamp=datetime(null), App, Level, TimeGenerated, Message, Revision, Replica, Stream),`,
+    `  (Base | top 8 by TimeGenerated desc | project Kind = "recentActivity", Key=strcat(App, "|", tostring(TimeGenerated)), Count=long(null), TotalLogs=long(null), ErrorsCount=long(null), WarningsCount=long(null), LastLogTimestamp=datetime(null), App, Level, TimeGenerated, Message, Revision, Replica, Stream),`,
   ].join("\n");
 }
 

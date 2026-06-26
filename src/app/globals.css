@@ -400,16 +400,82 @@
   }
 
   .query-bar {
-    @apply flex items-center gap-2 rounded-[var(--radius-md)] border border-border-strong bg-panel-raised px-3 py-2 backdrop-blur-sm;
-    box-shadow: 0 0 0 1px rgba(0, 217, 115, 0.06), 0 10px 28px rgba(0, 0, 0, 0.22);
+    @apply relative flex min-h-9 items-center gap-2 overflow-hidden rounded-full border border-border bg-[rgba(10,11,12,0.82)] px-3 backdrop-blur-md;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.05),
+      0 0 0 1px rgba(0, 217, 115, 0.05);
     transition:
-      border-color 200ms ease-out,
-      box-shadow 200ms ease-out;
+      border-color 220ms ease-out,
+      box-shadow 220ms ease-out,
+      background-color 220ms ease-out;
+  }
+
+  .query-bar:hover:not(:focus-within) {
+    border-color: rgba(255, 255, 255, 0.12);
+    background: rgba(12, 13, 14, 0.9);
   }
 
   .query-bar:focus-within {
     border-color: rgba(0, 217, 115, 0.45);
-    box-shadow: 0 0 0 1px rgba(0, 217, 115, 0.3), 0 0 22px rgba(0, 217, 115, 0.12);
+    background: rgba(6, 8, 7, 0.94);
+    box-shadow:
+      inset 0 1px 0 rgba(120, 255, 190, 0.1),
+      0 0 0 1px rgba(0, 217, 115, 0.32),
+      0 0 28px rgba(0, 217, 115, 0.14);
+  }
+
+  .query-bar-icon {
+    @apply flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-accent-bright;
+    transition:
+      color 220ms ease-out,
+      background-color 220ms ease-out,
+      box-shadow 220ms ease-out,
+      transform 180ms var(--motion-ease);
+  }
+
+  .query-bar:focus-within .query-bar-icon {
+    color: var(--accent-bright);
+    background: rgba(0, 217, 115, 0.14);
+    box-shadow: 0 0 14px rgba(0, 217, 115, 0.28);
+    transform: scale(1.04);
+  }
+
+  .query-bar-input {
+    @apply min-w-0 flex-1 border-0 bg-transparent py-1.5 font-mono text-[12px] leading-none text-fg outline-none ring-0;
+  }
+
+  .query-bar-input::placeholder {
+    color: var(--fg-subtle);
+    transition: color 200ms ease-out;
+  }
+
+  .query-bar:focus-within .query-bar-input::placeholder {
+    color: rgba(153, 153, 153, 0.65);
+  }
+
+  .query-bar-input::-webkit-search-decoration,
+  .query-bar-input::-webkit-search-cancel-button {
+    display: none;
+  }
+
+  .query-bar-kbd {
+    @apply hidden shrink-0 rounded-md border border-border bg-[rgba(255,255,255,0.04)] px-1.5 py-0.5 font-mono text-[10px] leading-none text-fg-subtle sm:inline;
+    transition: opacity 180ms ease-out;
+  }
+
+  .query-bar:focus-within .query-bar-kbd {
+    opacity: 0;
+  }
+
+  .query-bar-clear {
+    @apply motion-press flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-fg-subtle;
+    transition:
+      background-color var(--motion-base) ease-out,
+      color var(--motion-base) ease-out;
+  }
+
+  .query-bar-clear:hover {
+    @apply bg-glass text-fg;
   }
 
   .facet-row {
