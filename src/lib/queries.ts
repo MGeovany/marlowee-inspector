@@ -1,5 +1,7 @@
 import type { TimeRange } from "./authz";
 import type { LogLevel } from "./types";
+import type { QueryTimeWindow } from "./query-time";
+import { parseIsoDatetime } from "./query-time";
 
 /**
  * KQL builder. Security model:
@@ -45,12 +47,15 @@ export interface BuildQueryInput {
   level?: LogLevel;
   stream?: "stdout" | "stderr" | "all";
   requestId?: string;
+  testSessionId?: string;
   limit?: number;
+  timeWindow?: QueryTimeWindow;
 }
 
 export interface BuildSummaryQueryInput {
   apps: string[];
   range: TimeRange; // duration is applied by the SDK; kept here for clarity
+  timeWindow?: QueryTimeWindow;
 }
 
 export const METRICS_BUCKET_COUNT = 14;
@@ -74,6 +79,22 @@ export function metricsBinMinutes(range: TimeRange): number {
 
 const ERROR_TERMS = ["ERROR", "Error", "exception", "Exception", "FATAL", "panic", "stacktrace"];
 
+function kqlTimeWindowLines(window?: QueryTimeWindow): string[] {
+  if (!window) return [];
+  const lines: string[] = [];
+  if (window.since) {
+    const since = parseIsoDatetime(window.since);
+    if (!since) throw new Error("Invalid since timestamp");
+    lines.push(`| where TimeGenerated >= datetime("${since}")`);
+  }
+  if (window.until) {
+    const until = parseIsoDatetime(window.until);
+    if (!until) throw new Error("Invalid until timestamp");
+    lines.push(`| where TimeGenerated <= datetime("${until}")`);
+  }
+  return lines;
+}
+
 export function buildLogsQuery(input: BuildQueryInput): string {
   if (!(ALLOWED_APPS as readonly string[]).includes(input.app)) {
     throw new Error(`App not allowed: ${input.app}`);
@@ -87,6 +108,7 @@ export function buildLogsQuery(input: BuildQueryInput): string {
     '| extend Replica = tostring(column_ifexists("ContainerName_s", ""))',
     '| extend Stream = tolower(tostring(column_ifexists("Stream_s", "stdout")))',
     `| where App == "${escapeKql(input.app)}"`,
+    ...kqlTimeWindowLines(input.timeWindow),
   ];
 
   if (input.search && input.search.trim().length > 0) {
@@ -95,6 +117,10 @@ export function buildLogsQuery(input: BuildQueryInput): string {
 
   if (input.requestId && input.requestId.trim().length > 0) {
     lines.push(`| where Message contains "${escapeKql(input.requestId)}"`);
+  }
+
+  if (input.testSessionId && input.testSessionId.trim().length > 0) {
+    lines.push(`| where Message contains "${escapeKql(input.testSessionId)}"`);
   }
 
   if (input.stream && input.stream !== "all") {
@@ -148,6 +174,7 @@ export function buildLogsSummaryQuery(input: BuildSummaryQueryInput): string {
     '| extend Replica = tostring(column_ifexists("ContainerName_s", ""))',
     '| extend Stream = tolower(tostring(column_ifexists("Stream_s", "stdout")))',
     `| where App in (${appList})`,
+    ...kqlTimeWindowLines(input.timeWindow),
     "| extend Level = case(" +
       `Message has_any (${errorTerms}), "ERROR", ` +
       'Message has_any ("WARN","WARNING"), "WARN", ' +
@@ -181,6 +208,7 @@ export function buildMetricsQuery(input: BuildSummaryQueryInput): string {
     '| extend Message = tostring(column_ifexists("Log_s", ""))',
     '| extend Stream = tolower(tostring(column_ifexists("Stream_s", "stdout")))',
     "| where App in (AllowedApps)",
+    ...kqlTimeWindowLines(input.timeWindow),
     "| extend Level = case(" +
       `Message has_any (${errorTerms}), "ERROR", ` +
       'Message has_any ("WARN","WARNING"), "WARN", ' +

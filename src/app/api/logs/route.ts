@@ -4,6 +4,8 @@ import { auth } from "@/auth";
 import { capabilitiesFor, canReadApp, clampRange, highestRole } from "@/lib/authz";
 import { ALLOWED_APPS, buildLogsQuery, MAX_ROWS } from "@/lib/queries";
 import { queryLogs } from "@/lib/log-analytics";
+import { parseQueryTimeWindow, SinceUntilParams } from "@/lib/api-params";
+import { effectiveQueryRange } from "@/lib/query-time";
 import { maskString } from "@/lib/masking";
 import { rateLimit } from "@/lib/rate-limit";
 import { audit } from "@/lib/audit";
@@ -32,7 +34,7 @@ const QuerySchema = z.object({
   errorsOnly: BoolParam,
   raw: BoolParam,
   limit: z.coerce.number().int().min(1).max(MAX_ROWS).default(200),
-});
+}).merge(SinceUntilParams);
 
 export async function GET(req: NextRequest) {
   // 1. Authn
@@ -56,11 +58,23 @@ export async function GET(req: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ error: "invalid request", details: parsed.error.flatten() }, { status: 400 });
   }
-  const { app, search, errorsOnly, level, stream, requestId, limit } = parsed.data;
+  const { app, search, errorsOnly, level, stream, requestId, testSessionId, limit } = parsed.data;
   const range = clampRange(caps, parsed.data.range);
   const raw = parsed.data.raw && caps.canSeeRaw; // raw only honored for Admin
   // errorsOnly already narrows to errors; ignore an explicit level in that case.
   const effectiveLevel = errorsOnly ? undefined : level;
+
+  let timeWindow;
+  try {
+    timeWindow = parseQueryTimeWindow(parsed.data);
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "invalid time window" },
+      { status: 400 },
+    );
+  }
+
+  const queryRange = effectiveQueryRange(range, timeWindow ?? {});
 
   // 4. Authz: app allowlist for this role
   if (!canReadApp(caps, app)) {
@@ -82,15 +96,17 @@ export async function GET(req: NextRequest) {
   try {
     const kql = buildLogsQuery({
       app,
-      range,
+      range: queryRange,
       search,
       errorsOnly,
       level: effectiveLevel,
       stream,
       requestId,
+      testSessionId,
       limit,
+      timeWindow,
     });
-    const rows: LogEntry[] = await queryLogs(kql, range);
+    const rows: LogEntry[] = await queryLogs(kql, queryRange);
 
     // Mask both the message and the raw payload server-side (raw mode = Admin only).
     const masked = raw
@@ -104,20 +120,23 @@ export async function GET(req: NextRequest) {
       oid,
       role,
       app,
-      range,
+      range: queryRange,
       search,
       errorsOnly,
       rawMode: raw,
       rowCount: masked.length,
+      testSessionId,
+      since: timeWindow?.since,
     });
 
     // 8. Respond
     return NextResponse.json({
       rows: masked,
-      range,
+      range: queryRange,
       masked: !raw,
       source: "azure",
       total: masked.length,
+      timeWindow: timeWindow ?? null,
     });
   } catch (err) {
     console.error("Log Analytics query failed", err);

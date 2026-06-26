@@ -42,6 +42,7 @@ export interface LogsResponse {
   range: TimeRange;
   masked: boolean;
   source: "mock" | "azure";
+  timeWindow?: { since?: string; until?: string } | null;
 }
 
 export interface LogsSummaryResponse {
@@ -59,6 +60,7 @@ export interface LogsSummaryResponse {
   apps: ContainerApp[];
   timeRange: TimeRange;
   source: "azure";
+  timeWindow?: { since?: string; until?: string } | null;
 }
 
 /** Time-bucketed metrics returned by /api/logs/metrics (Azure KQL aggregates). */

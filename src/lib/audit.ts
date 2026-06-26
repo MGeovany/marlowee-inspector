@@ -20,6 +20,8 @@ export interface AuditEvent {
   rawMode?: boolean;
   rowCount?: number;
   requestId?: string;
+  testSessionId?: string;
+  since?: string;
   reason?: string;
 }
 

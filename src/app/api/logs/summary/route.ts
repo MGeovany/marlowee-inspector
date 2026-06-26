@@ -4,6 +4,8 @@ import { auth } from "@/auth";
 import { capabilitiesFor, canReadApp, clampRange, highestRole } from "@/lib/authz";
 import { queryLogAnalyticsTable } from "@/lib/log-analytics";
 import { maskString } from "@/lib/masking";
+import { parseQueryTimeWindow, SinceUntilParams } from "@/lib/api-params";
+import { effectiveQueryRange, logsPerMinute } from "@/lib/query-time";
 import { ALLOWED_APPS, buildLogsSummaryQuery } from "@/lib/queries";
 import { rateLimit } from "@/lib/rate-limit";
 import { audit } from "@/lib/audit";
@@ -12,7 +14,7 @@ import { TIME_RANGE_MS, type ContainerApp, type LogEntry, type LogLevel, type Lo
 const QuerySchema = z.object({
   app: z.enum(ALLOWED_APPS).optional(),
   timeRange: z.enum(["1h", "24h", "7d"]).default("24h"),
-});
+}).merge(SinceUntilParams);
 
 const LEVELS: LogLevel[] = ["ERROR", "WARN", "INFO", "LOG"];
 
@@ -40,6 +42,18 @@ export async function GET(req: NextRequest) {
   const timeRange = clampRange(caps, parsed.data.timeRange);
   const apps = requestedApp ? [requestedApp] : allowedAppsForRole(caps.apps);
 
+  let timeWindow;
+  try {
+    timeWindow = parseQueryTimeWindow(parsed.data);
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "invalid time window" },
+      { status: 400 },
+    );
+  }
+
+  const queryRange = effectiveQueryRange(timeRange, timeWindow ?? {});
+
   if (requestedApp && !canReadApp(caps, requestedApp)) {
     audit({ type: "denied", actor, oid, role, app: requestedApp, reason: "app not permitted for role" });
     return NextResponse.json({ error: "forbidden: app not permitted" }, { status: 403 });
@@ -59,9 +73,15 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const kql = buildLogsSummaryQuery({ apps, range: timeRange });
-    const table = await queryLogAnalyticsTable(kql, timeRange);
-    const summary = normalizeSummaryTable(table?.columnNames ?? [], table?.rows ?? [], apps, timeRange);
+    const kql = buildLogsSummaryQuery({ apps, range: queryRange, timeWindow });
+    const table = await queryLogAnalyticsTable(kql, queryRange);
+    const summary = normalizeSummaryTable(
+      table?.columnNames ?? [],
+      table?.rows ?? [],
+      apps,
+      timeRange,
+      timeWindow,
+    );
 
     audit({
       type: "search",
@@ -89,6 +109,7 @@ function normalizeSummaryTable(
   rows: unknown[][],
   apps: ContainerApp[],
   timeRange: LogsSummaryResponse["timeRange"],
+  timeWindow?: { since?: string; until?: string },
 ): LogsSummaryResponse {
   const index = (name: string) => columnNames.findIndex((column) => column === name);
   const columns = {
@@ -160,7 +181,9 @@ function normalizeSummaryTable(
     totalLogs,
     errorsCount,
     warningsCount,
-    logsPerMinute: roundOneDecimal(totalLogs / (TIME_RANGE_MS[timeRange] / 60_000)),
+    logsPerMinute: timeWindow?.since
+      ? logsPerMinute(totalLogs, timeWindow)
+      : roundOneDecimal(totalLogs / (TIME_RANGE_MS[timeRange] / 60_000)),
     mostNoisyApp,
     mostNoisyAppCount,
     latestError,
@@ -171,6 +194,7 @@ function normalizeSummaryTable(
     apps,
     timeRange,
     source: "azure",
+    timeWindow: timeWindow ?? null,
   };
 }
 
