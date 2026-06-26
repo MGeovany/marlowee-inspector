@@ -7,6 +7,7 @@ interface LogsSummaryCardsProps {
   summary: LogsSummaryResponse | null;
   loading: boolean;
   live: boolean;
+  sessionActive?: boolean;
 }
 
 const CARDS = [
@@ -36,7 +37,7 @@ const CARDS = [
   },
 ];
 
-export function LogsSummaryCards({ summary, loading, live }: LogsSummaryCardsProps) {
+export function LogsSummaryCards({ summary, loading, live, sessionActive }: LogsSummaryCardsProps) {
   const values: Record<(typeof CARDS)[number]["key"], string> = {
     totalLogs: formatNumber(summary?.totalLogs),
     errorsCount: formatNumber(summary?.errorsCount),
@@ -54,7 +55,7 @@ export function LogsSummaryCards({ summary, loading, live }: LogsSummaryCardsPro
           accent={card.accent}
           tone={card.tone}
           loading={loading}
-          badge={badgeFor(card.key, summary, live)}
+          badge={badgeFor(card.key, summary, live, sessionActive)}
         />
       ))}
     </div>
@@ -65,8 +66,12 @@ function badgeFor(
   key: (typeof CARDS)[number]["key"],
   summary: LogsSummaryResponse | null,
   live: boolean,
+  sessionActive?: boolean,
 ): { text: string; className: string } | null {
   if (!summary) return null;
+  if (sessionActive && key === "totalLogs") {
+    return { text: "session", className: "text-accent" };
+  }
   if (key === "totalLogs" && summary.mostNoisyApp) {
     return { text: `noisy: ${summary.mostNoisyApp}`, className: "text-fg-subtle" };
   }

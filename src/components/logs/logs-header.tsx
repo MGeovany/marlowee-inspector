@@ -43,7 +43,7 @@ export function LogsHeader({
 
         <div className="flex items-center gap-2">
           {testSession && (
-            <Badge variant={testSession.status === "active" ? "default" : "neutral"}>
+            <Badge variant={testSession.status === "active" ? "accent" : "neutral"}>
               Session · {testSession.status === "active" ? "live" : "stopped"}
             </Badge>
           )}

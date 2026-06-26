@@ -18,6 +18,7 @@ interface LogsTableProps {
   selectedId: string | null;
   onRowClick: (entry: LogEntry) => void;
   onRetry: () => void;
+  emptyHint?: string;
 }
 
 const LEVEL_COLOR: Record<string, string> = {
@@ -36,10 +37,13 @@ export function LogsTable({
   selectedId,
   onRowClick,
   onRetry,
+  emptyHint,
 }: LogsTableProps) {
   if (status === "loading") return <LoadingState />;
   if (status === "error") return <ErrorState message={error} onRetry={onRetry} />;
-  if (status === "success" && rows.length === 0) return <EmptyState timeRange={timeRange} />;
+  if (status === "success" && rows.length === 0) {
+    return <EmptyState timeRange={timeRange} hint={emptyHint} />;
+  }
 
   return (
     <div className="h-full overflow-auto">
@@ -157,7 +161,7 @@ function LoadingState() {
   );
 }
 
-function EmptyState({ timeRange }: { timeRange: string }) {
+function EmptyState({ timeRange, hint }: { timeRange: string; hint?: string }) {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-2 p-10 text-center">
       <div className="mb-1 flex h-10 w-10 items-center justify-center rounded-md border border-border bg-panel text-accent">
@@ -165,7 +169,7 @@ function EmptyState({ timeRange }: { timeRange: string }) {
       </div>
       <p className="text-micro font-medium text-fg">No logs match</p>
       <p className="max-w-xs text-[11px] leading-relaxed text-fg-subtle">
-        Nothing in the last {timeRange}. Widen the range, clear filters, or disable Errors only.
+        {hint ?? `Nothing in the last ${timeRange}. Widen the range, clear filters, or disable Errors only.`}
       </p>
     </div>
   );

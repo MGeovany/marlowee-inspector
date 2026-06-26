@@ -122,7 +122,7 @@ export function TestSessionBar({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 space-y-1">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant={session.status === "active" ? "default" : "neutral"}>
+            <Badge variant={session.status === "active" ? "accent" : "neutral"}>
               {session.status === "active" ? "Recording" : "Stopped"}
             </Badge>
             <span className="truncate font-medium text-fg">{session.name}</span>
