@@ -149,6 +149,8 @@ export interface MockQuery {
   search?: string;
   errorsOnly?: boolean;
   level?: LogLevel;
+  stream?: "stdout" | "stderr" | "all";
+  requestId?: string;
   limit?: number;
 }
 
@@ -156,6 +158,7 @@ export interface MockQuery {
 export function queryMockLogs(q: MockQuery): LogEntry[] {
   const cutoff = Date.now() - TIME_RANGE_MS[q.range];
   const search = q.search?.trim().toLowerCase();
+  const requestId = q.requestId?.trim().toLowerCase();
   const limit = Math.min(q.limit ?? 200, 1000);
 
   return DATASET.filter((row) => {
@@ -163,7 +166,12 @@ export function queryMockLogs(q: MockQuery): LogEntry[] {
     if (new Date(row.timeGenerated).getTime() < cutoff) return false;
     if (q.errorsOnly && row.level !== "ERROR") return false;
     if (!q.errorsOnly && q.level && row.level !== q.level) return false;
+    if (q.stream && q.stream !== "all" && row.stream !== q.stream) return false;
     if (search && !row.message.toLowerCase().includes(search)) return false;
+    if (requestId) {
+      const rid = row.requestId?.toLowerCase() ?? "";
+      if (!rid.includes(requestId) && !row.message.toLowerCase().includes(requestId)) return false;
+    }
     return true;
   }).slice(0, limit);
 }

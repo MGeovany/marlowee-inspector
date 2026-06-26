@@ -39,6 +39,12 @@ const BRIEF_INTRO: Record<
       "A debug-level log from our Savvly container app. Help me trace execution flow, explain the underlying behavior, and point to relevant code paths.",
     section: "Debug output",
   },
+  LOG: {
+    title: "Application log — context brief",
+    prompt:
+      "An uncategorised log line from our Savvly container app. Help me understand what it represents, whether it matters, and where it fits in the system.",
+    section: "Log output",
+  },
 };
 
 /** Builds a self-contained, AI-friendly brief for a log entry. */

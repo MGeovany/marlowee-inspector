@@ -4,7 +4,9 @@
  * shape (see lib/log-analytics.ts) so the mock phase and the real phase agree.
  */
 
-export type LogLevel = "ERROR" | "WARN" | "INFO" | "DEBUG";
+// ERROR/WARN/INFO/LOG are what the Azure level detection emits (see lib/queries.ts).
+// DEBUG is retained for the local mock dataset.
+export type LogLevel = "ERROR" | "WARN" | "INFO" | "LOG" | "DEBUG";
 
 export type ContainerApp = "ca-data-api" | "ca-dashboard" | "ca-onboarding" | "ca-admin";
 
@@ -42,7 +44,8 @@ export interface LogsResponse {
   source: "mock" | "azure";
 }
 
-export const LOG_LEVELS: LogLevel[] = ["ERROR", "WARN", "INFO", "DEBUG"];
+// Levels offered in the filter dropdown — the set Azure detection produces.
+export const LOG_LEVELS: LogLevel[] = ["ERROR", "WARN", "INFO", "LOG"];
 export const TIME_RANGES: TimeRange[] = ["1h", "24h", "7d"];
 export const ALL_APPS: ContainerApp[] = ["ca-data-api", "ca-dashboard", "ca-onboarding", "ca-admin"];
 

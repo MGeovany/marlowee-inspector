@@ -6,6 +6,7 @@ const VARIANT: Record<LogLevel, "error" | "warn" | "info" | "debug"> = {
   ERROR: "error",
   WARN: "warn",
   INFO: "info",
+  LOG: "debug",
   DEBUG: "debug",
 };
 

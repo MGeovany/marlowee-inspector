@@ -24,6 +24,7 @@ const LEVEL_COLOR: Record<string, string> = {
   ERROR: "text-level-error",
   WARN: "text-level-warn",
   INFO: "text-level-info",
+  LOG: "text-level-debug",
   DEBUG: "text-level-debug",
 };
 

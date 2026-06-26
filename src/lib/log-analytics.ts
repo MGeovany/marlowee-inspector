@@ -1,11 +1,12 @@
 import { DefaultAzureCredential, ManagedIdentityCredential } from "@azure/identity";
 import { Durations, LogsQueryClient, LogsQueryResultStatus } from "@azure/monitor-query";
 import type { TimeRange } from "./authz";
+import type { ContainerApp, LogEntry, LogLevel } from "./types";
 
 /**
  * Log Analytics access via the app's own identity. Local dev uses `az login`
  * (DefaultAzureCredential); production uses a user-assigned Managed Identity.
- * No secrets are stored for this path.
+ * No secrets are stored for this path, and the workspace id never leaves the server.
  */
 
 function credential() {
@@ -25,16 +26,19 @@ const DURATION: Record<TimeRange, string> = {
   "7d": Durations.sevenDays,
 };
 
-export interface LogRow {
-  timeGenerated: string;
-  app: string;
-  level: string;
-  message: string;
-  [k: string]: unknown;
+const KNOWN_LEVELS: LogLevel[] = ["ERROR", "WARN", "INFO", "LOG", "DEBUG"];
+
+/** Normalise the case()-derived level string into the LogLevel union (defaults to LOG). */
+function normalizeLevel(value: string): LogLevel {
+  const upper = value.toUpperCase();
+  return (KNOWN_LEVELS as string[]).includes(upper) ? (upper as LogLevel) : "LOG";
 }
 
-/** Run a read-only KQL query against law-savvly-dev-main and return typed rows. */
-export async function queryLogs(kql: string, range: TimeRange): Promise<LogRow[]> {
+/**
+ * Run a read-only KQL query against the workspace and return normalized rows:
+ * { id, timeGenerated, app, level, message, revision, replica, stream, raw }.
+ */
+export async function queryLogs(kql: string, range: TimeRange): Promise<LogEntry[]> {
   const workspaceId = process.env.AZURE_LOG_ANALYTICS_WORKSPACE_ID;
   if (!workspaceId) throw new Error("AZURE_LOG_ANALYTICS_WORKSPACE_ID is not set");
 
@@ -50,15 +54,31 @@ export async function queryLogs(kql: string, range: TimeRange): Promise<LogRow[]
   if (!table) return [];
 
   const idx = (name: string) => table.columnDescriptors.findIndex((c) => c.name === name);
-  const tg = idx("TimeGenerated");
-  const app = idx("App");
-  const level = idx("Level");
-  const msg = idx("Message");
+  const cTime = idx("TimeGenerated");
+  const cApp = idx("App");
+  const cLevel = idx("Level");
+  const cMsg = idx("Message");
+  const cRev = idx("Revision");
+  const cReplica = idx("Replica");
+  const cStream = idx("Stream");
+  const cRaw = idx("Raw");
 
-  return table.rows.map((row) => ({
-    timeGenerated: String(row[tg] ?? ""),
-    app: String(row[app] ?? ""),
-    level: String(row[level] ?? "INFO"),
-    message: String(row[msg] ?? ""),
-  }));
+  const at = (row: unknown[], i: number) => (i >= 0 ? String(row[i] ?? "") : "");
+
+  return table.rows.map((row, i) => {
+    const timeGenerated = at(row, cTime);
+    const stream = at(row, cStream) === "stderr" ? "stderr" : "stdout";
+    const message = at(row, cMsg);
+    return {
+      id: `${at(row, cApp)}:${i}:${timeGenerated}`,
+      timeGenerated,
+      app: at(row, cApp) as ContainerApp,
+      level: normalizeLevel(at(row, cLevel) || "LOG"),
+      message,
+      revision: at(row, cRev),
+      replica: at(row, cReplica),
+      stream,
+      raw: at(row, cRaw) || message,
+    } satisfies LogEntry;
+  });
 }

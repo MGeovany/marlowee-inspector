@@ -2,12 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/auth";
 import { capabilitiesFor, canReadApp, clampRange, highestRole } from "@/lib/authz";
-import { buildLogsQuery } from "@/lib/queries";
+import { buildLogsQuery, MAX_ROWS } from "@/lib/queries";
 import { queryLogs } from "@/lib/log-analytics";
-import { maskRows, maskString } from "@/lib/masking";
+import { maskString } from "@/lib/masking";
 import { queryMockLogs } from "@/lib/mock-logs";
 import { rateLimit } from "@/lib/rate-limit";
 import { audit } from "@/lib/audit";
+import type { LogEntry } from "@/lib/types";
 
 /**
  * Mock phase (default): serve the local mock dataset instead of querying Azure.
@@ -22,9 +23,12 @@ const QuerySchema = z.object({
   app: z.string().min(1),
   range: z.enum(["1h", "24h", "7d"]).default("24h"),
   search: z.string().max(256).optional(),
-  level: z.enum(["ERROR", "WARN", "INFO", "DEBUG"]).optional(),
+  level: z.enum(["ERROR", "WARN", "INFO", "LOG"]).optional(),
+  stream: z.enum(["stdout", "stderr", "all"]).default("all"),
+  requestId: z.string().max(128).optional(),
   errorsOnly: z.boolean().default(false),
   raw: z.boolean().default(false),
+  limit: z.number().int().min(1).max(MAX_ROWS).default(200),
 });
 
 export async function POST(req: NextRequest) {
@@ -49,9 +53,11 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ error: "invalid request", details: parsed.error.flatten() }, { status: 400 });
   }
-  const { app, search, errorsOnly, level } = parsed.data;
+  const { app, search, errorsOnly, level, stream, requestId, limit } = parsed.data;
   const range = clampRange(caps, parsed.data.range);
   const raw = parsed.data.raw && caps.canSeeRaw; // raw only honored for Admin
+  // errorsOnly already narrows to errors; ignore an explicit level in that case.
+  const effectiveLevel = errorsOnly ? undefined : level;
 
   // 4. Authz: app allowlist for this role
   if (!canReadApp(caps, app)) {
@@ -71,19 +77,27 @@ export async function POST(req: NextRequest) {
 
   // 6. Build + run query (mock dataset, or read-only KQL against Azure)
   try {
-    let masked;
+    let rows: LogEntry[];
     if (USE_MOCK) {
-      const rows = queryMockLogs({ app, range, search, errorsOnly, level });
-      // Mask both the message and the raw payload server-side (raw mode = Admin only).
-      masked = raw
-        ? rows
-        : rows.map((r) => ({ ...r, message: maskString(r.message), raw: maskString(r.raw) }));
+      rows = queryMockLogs({
+        app,
+        range,
+        search,
+        errorsOnly,
+        level: effectiveLevel,
+        stream,
+        requestId,
+        limit,
+      });
     } else {
-      const kql = buildLogsQuery({ app, range, search, errorsOnly });
-      const rows = await queryLogs(kql, range);
-      const filtered = level ? rows.filter((r) => r.level === level) : rows;
-      masked = maskRows(filtered, raw);
+      const kql = buildLogsQuery({ app, range, search, errorsOnly, level: effectiveLevel, limit });
+      rows = await queryLogs(kql, range);
     }
+
+    // Mask both the message and the raw payload server-side (raw mode = Admin only).
+    const masked = raw
+      ? rows
+      : rows.map((r) => ({ ...r, message: maskString(r.message), raw: maskString(r.raw) }));
 
     // 7. Audit
     audit({
