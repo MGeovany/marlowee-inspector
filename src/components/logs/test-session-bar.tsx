@@ -108,7 +108,7 @@ export function TestSessionBar({
     );
   }
 
-  const window = sessionTimeWindow(session);
+  const timeWindow = sessionTimeWindow(session);
 
   return (
     <div
@@ -130,8 +130,8 @@ export function TestSessionBar({
           <div className="flex flex-wrap gap-x-4 gap-y-1 font-mono text-[11px] tabular-nums text-fg-muted">
             <span>Duration {formatSessionDuration(durationMs)}</span>
             <span>{logCount.toLocaleString()} logs captured</span>
-            <span>Since {new Date(window.since!).toLocaleTimeString()}</span>
-            {window.until && <span>Until {new Date(window.until).toLocaleTimeString()}</span>}
+            <span>Since {new Date(timeWindow.since!).toLocaleTimeString()}</span>
+            {timeWindow.until && <span>Until {new Date(timeWindow.until).toLocaleTimeString()}</span>}
           </div>
           <div className="flex flex-wrap items-center gap-2 pt-1">
             <span className="text-[10px] uppercase tracking-[0.05em] text-fg-subtle">Session ID</span>

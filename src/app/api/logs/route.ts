@@ -6,7 +6,7 @@ import { ALLOWED_APPS, buildLogsQuery, MAX_ROWS } from "@/lib/queries";
 import { queryLogs } from "@/lib/log-analytics";
 import { parseQueryTimeWindow, SinceUntilParams } from "@/lib/api-params";
 import { effectiveQueryRange } from "@/lib/query-time";
-import { maskString } from "@/lib/masking";
+import { maskRows } from "@/lib/masking";
 import { rateLimit } from "@/lib/rate-limit";
 import { audit } from "@/lib/audit";
 import type { LogEntry } from "@/lib/types";
@@ -60,7 +60,6 @@ export async function GET(req: NextRequest) {
   }
   const { app, search, errorsOnly, level, stream, requestId, testSessionId, limit } = parsed.data;
   const range = clampRange(caps, parsed.data.range);
-  const raw = parsed.data.raw && caps.canSeeRaw; // raw only honored for Admin
   // errorsOnly already narrows to errors; ignore an explicit level in that case.
   const effectiveLevel = errorsOnly ? undefined : level;
 
@@ -108,14 +107,12 @@ export async function GET(req: NextRequest) {
     });
     const rows: LogEntry[] = await queryLogs(kql, queryRange);
 
-    // Mask both the message and the raw payload server-side (raw mode = Admin only).
-    const masked = raw
-      ? rows
-      : rows.map((r) => ({ ...r, message: maskString(r.message), rawPayload: maskString(r.rawPayload) }));
+    // Raw unmasked logs are not exposed yet; mask every frontend response server-side.
+    const masked = maskRows(rows);
 
     // 7. Audit
     audit({
-      type: raw ? "raw_search" : "search",
+      type: "search",
       actor,
       oid,
       role,
@@ -123,7 +120,7 @@ export async function GET(req: NextRequest) {
       range: queryRange,
       search,
       errorsOnly,
-      rawMode: raw,
+      rawMode: false,
       rowCount: masked.length,
       testSessionId,
       since: timeWindow?.since,
@@ -133,7 +130,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       rows: masked,
       range: queryRange,
-      masked: !raw,
+      masked: true,
       source: "azure",
       total: masked.length,
       timeWindow: timeWindow ?? null,
