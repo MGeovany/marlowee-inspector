@@ -194,6 +194,11 @@
   .chip-active {
     @apply border-transparent bg-accent font-medium text-black;
     background: linear-gradient(90deg, var(--accent-bright), var(--accent));
+    transition:
+      background-color var(--motion-base) ease-out,
+      color var(--motion-base) ease-out,
+      border-color var(--motion-base) ease-out,
+      box-shadow var(--motion-base) ease-out;
   }
 
   .level-chip {
@@ -204,22 +209,38 @@
     @apply border-[rgba(242,77,77,0.4)] bg-[rgba(242,77,77,0.14)] text-level-error;
     background: rgba(242, 77, 77, 0.14);
     color: var(--red);
+    transition:
+      background-color var(--motion-base) ease-out,
+      color var(--motion-base) ease-out,
+      border-color var(--motion-base) ease-out;
   }
 
   .level-chip-warn.chip-active {
     @apply border-[rgba(255,157,0,0.4)] bg-[rgba(255,157,0,0.12)] text-level-warn;
     background: rgba(255, 157, 0, 0.12);
     color: var(--orange);
+    transition:
+      background-color var(--motion-base) ease-out,
+      color var(--motion-base) ease-out,
+      border-color var(--motion-base) ease-out;
   }
 
   .level-chip-info.chip-active {
     @apply border-[rgba(69,217,255,0.35)] bg-[rgba(69,217,255,0.1)] text-level-info;
     background: rgba(69, 217, 255, 0.1);
     color: var(--blue);
+    transition:
+      background-color var(--motion-base) ease-out,
+      color var(--motion-base) ease-out,
+      border-color var(--motion-base) ease-out;
   }
 
   .level-chip-log.chip-active {
     @apply border-border-strong bg-glass text-fg-muted;
+    transition:
+      background-color var(--motion-base) ease-out,
+      color var(--motion-base) ease-out,
+      border-color var(--motion-base) ease-out;
   }
 
   .filter-toolbar {
@@ -227,7 +248,55 @@
   }
 
   .filter-segment {
-    @apply inline-flex items-center rounded-full border border-border bg-glass p-0.5 backdrop-blur-sm;
+    @apply relative inline-flex items-center overflow-hidden rounded-full border border-border bg-glass p-0.5 backdrop-blur-sm;
+  }
+
+  .segment-indicator {
+    @apply pointer-events-none absolute left-0 top-0.5 z-0 h-[calc(100%-4px)] rounded-full opacity-0;
+    background: linear-gradient(90deg, var(--accent-bright), var(--accent));
+    box-shadow: 0 0 14px rgba(0, 217, 115, 0.18);
+    transition:
+      transform 240ms var(--motion-ease),
+      width 240ms var(--motion-ease),
+      opacity 180ms ease-out;
+    will-change: transform, width;
+  }
+
+  .segment-indicator-visible {
+    @apply opacity-100;
+  }
+
+  .segment-option {
+    @apply relative z-10 inline-flex min-w-0 cursor-pointer select-none items-center justify-center border border-transparent bg-transparent px-3 py-1 text-[11px] font-medium text-fg-subtle;
+    transition:
+      color var(--motion-base) ease-out,
+      transform var(--motion-fast) var(--motion-ease);
+  }
+
+  .segment-option-mono {
+    @apply px-2.5 font-mono text-[10px];
+  }
+
+  .segment-option:hover:not(:disabled):not(.segment-option-active) {
+    @apply text-fg;
+  }
+
+  .segment-option-active {
+    @apply text-black;
+  }
+
+  .segment-option:active:not(:disabled) {
+    transform: scale(0.96);
+  }
+
+  .segment-option-static {
+    @apply segment-option segment-option-active cursor-default;
+  }
+
+  .filter-segment-filled {
+    @apply border-transparent;
+    background: linear-gradient(90deg, var(--accent-bright), var(--accent));
+    box-shadow: 0 0 14px rgba(0, 217, 115, 0.12);
   }
 
   .section-label {
@@ -505,6 +574,7 @@
   .facet-row:active,
   .sidebar-nav-item:active,
   .sidebar-service-row:active,
+  .segment-option:active,
   .motion-press:active:not(:disabled),
   .obs-row:active {
     transform: none;
@@ -514,5 +584,9 @@
   .animate-drawer-in,
   .animate-fade-up-in {
     animation: none !important;
+  }
+
+  .segment-indicator {
+    transition: none !important;
   }
 }

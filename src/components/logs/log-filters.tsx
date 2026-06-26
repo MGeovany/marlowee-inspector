@@ -4,6 +4,7 @@ import { Search } from "lucide-react";
 
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { SegmentControl } from "@/components/ui/segment-control";
 import { cn } from "@/lib/utils";
 import {
   type ContainerApp,
@@ -104,54 +105,37 @@ export function LogFilters({
         ))}
       </div>
 
-      <div className="filter-segment">
-        {sessionMode ? (
-          <span className="chip chip-active cursor-default font-mono text-[10px]">
-            Session window
-          </span>
-        ) : (
-          TIME_RANGES.map((r, i) => {
-            const disabled = i > maxIdx;
-            const active = timeRange === r;
-            return (
-              <button
-                key={r}
-                type="button"
-                disabled={disabled}
-                onClick={() => onTimeRangeChange(r)}
-                title={disabled ? `Max range for your role: ${maxRange}` : undefined}
-                className={cn(
-                  "chip rounded-sm px-2.5",
-                  active && "chip-active",
-                  disabled && "cursor-not-allowed opacity-35",
-                )}
-              >
-                {TIME_RANGE_LABEL[r]}
-              </button>
-            );
-          })
-        )}
-      </div>
+      {sessionMode ? (
+        <div className="filter-segment filter-segment-filled">
+          <span className="segment-option-static segment-option-mono">Session window</span>
+        </div>
+      ) : (
+        <SegmentControl
+          value={timeRange}
+          onValueChange={onTimeRangeChange}
+          mono
+          options={TIME_RANGES.map((r, i) => ({
+            value: r,
+            label: TIME_RANGE_LABEL[r],
+            disabled: i > maxIdx,
+            title: i > maxIdx ? `Max range for your role: ${maxRange}` : undefined,
+          }))}
+        />
+      )}
 
       <div className="hidden h-5 w-px bg-border lg:block" />
 
-      <div className="hidden items-center gap-0.5 lg:flex">
-        {(
-          [
+      <div className="hidden lg:block">
+        <SegmentControl
+          value={stream}
+          onValueChange={onStreamChange}
+          mono
+          options={[
             { value: "all", label: "all" },
             { value: "stdout", label: "stdout" },
             { value: "stderr", label: "stderr" },
-          ] as const
-        ).map((s) => (
-          <button
-            key={s.value}
-            type="button"
-            onClick={() => onStreamChange(s.value)}
-            className={cn("chip font-mono", stream === s.value && "chip-active")}
-          >
-            {s.label}
-          </button>
-        ))}
+          ]}
+        />
       </div>
     </div>
   );

@@ -78,6 +78,8 @@ export interface LogMetricsResponse {
     activeIncidents: number[];
     logsPerMin: number[];
     avgResponse: number[];
+    totalLogs: number[];
+    warnings: number[];
   };
 }
 

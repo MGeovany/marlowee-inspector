@@ -2,9 +2,18 @@
 
 import { cn } from "@/lib/utils";
 import type { LogsSummaryResponse } from "@/lib/types";
+import { Sparkline } from "./sparkline";
+
+export interface SummaryCardSparklines {
+  totalLogs: number[];
+  errorsCount: number[];
+  warningsCount: number[];
+  logsPerMinute: number[];
+}
 
 interface LogsSummaryCardsProps {
   summary: LogsSummaryResponse | null;
+  sparklines: SummaryCardSparklines | null;
   loading: boolean;
   live: boolean;
   sessionActive?: boolean;
@@ -15,25 +24,35 @@ const CARDS = [
     key: "totalLogs" as const,
     label: "Total logs",
     tone: "info" as const,
+    sparkKey: "totalLogs" as const,
   },
   {
     key: "errorsCount" as const,
     label: "Errors",
     tone: "error" as const,
+    sparkKey: "errorsCount" as const,
   },
   {
     key: "warningsCount" as const,
     label: "Warnings",
     tone: "warn" as const,
+    sparkKey: "warningsCount" as const,
   },
   {
     key: "logsPerMinute" as const,
     label: "Logs / min",
     tone: "success" as const,
+    sparkKey: "logsPerMinute" as const,
   },
 ];
 
-export function LogsSummaryCards({ summary, loading, live, sessionActive }: LogsSummaryCardsProps) {
+export function LogsSummaryCards({
+  summary,
+  sparklines,
+  loading,
+  live,
+  sessionActive,
+}: LogsSummaryCardsProps) {
   const values: Record<(typeof CARDS)[number]["key"], string> = {
     totalLogs: formatNumber(summary?.totalLogs),
     errorsCount: formatNumber(summary?.errorsCount),
@@ -50,6 +69,7 @@ export function LogsSummaryCards({ summary, loading, live, sessionActive }: Logs
           value={values[card.key]}
           tone={card.tone}
           loading={loading}
+          sparkline={sparklines?.[card.sparkKey] ?? []}
           badge={badgeFor(card.key, summary, live, sessionActive)}
         />
       ))}
@@ -93,12 +113,14 @@ function MetricCard({
   value,
   tone,
   loading,
+  sparkline,
   badge,
 }: {
   label: string;
   value: string;
   tone: "error" | "warn" | "info" | "success";
   loading: boolean;
+  sparkline: number[];
   badge: { text: string; className: string; live?: boolean } | null;
 }) {
   return (
@@ -112,7 +134,10 @@ function MetricCard({
           </span>
         )}
       </div>
-      <p className={cn("metric-value", toneClass(tone), loading && "opacity-50")}>{value}</p>
+      <div className="mt-1 flex items-end justify-between gap-2">
+        <p className={cn("metric-value", toneClass(tone), loading && "opacity-50")}>{value}</p>
+        <Sparkline values={sparkline} tone={tone} loading={loading} />
+      </div>
     </div>
   );
 }

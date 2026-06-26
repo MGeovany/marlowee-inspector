@@ -6,6 +6,8 @@ import {
   METRICS_BUCKET_COUNT,
   metricsBinMinutes,
 } from "./queries";
+import type { QueryTimeWindow } from "./query-time";
+import { effectiveQueryRange } from "./query-time";
 import type { ContainerApp, LogEntry, LogLevel, LogMetricsResponse } from "./types";
 import { TIME_RANGE_MS } from "./types";
 
@@ -161,16 +163,19 @@ function deltaFromAverages(values: number[]): number | null {
 export async function queryMetrics(
   apps: ContainerApp[],
   range: TimeRange,
+  timeWindow?: QueryTimeWindow,
 ): Promise<LogMetricsResponse> {
-  const kql = buildMetricsQuery({ apps, range });
-  const table = await queryLogAnalyticsTable(kql, range);
+  const queryRange = effectiveQueryRange(range, timeWindow ?? {});
+  const kql = buildMetricsQuery({ apps, range: queryRange, timeWindow });
+  const table = await queryLogAnalyticsTable(kql, queryRange);
   if (!table) {
-    return emptyMetrics(range);
+    return emptyMetrics(queryRange);
   }
 
   const idx = (name: string) => table.columnNames.findIndex((c) => c === name);
   const cKind = idx("Kind");
   const cErrors = idx("Errors");
+  const cWarnings = idx("Warnings");
   const cLogs = idx("Logs");
   const cAvgLatency = idx("AvgLatencyMs");
   const cActiveIncidents = idx("ActiveIncidents");
@@ -181,9 +186,17 @@ export async function queryMetrics(
   const bucketRows = table.rows.filter((row) => stringifyCell(row[cKind]) === "bucket");
   const totalsRow = table.rows.find((row) => stringifyCell(row[cKind]) === "totals");
 
-  const binMinutes = metricsBinMinutes(range);
-  const openErrorsSeries = padSeries(
+  const binMinutes = metricsBinMinutes(queryRange);
+  const errorsSeries = padSeries(
     bucketRows.map((row) => numberCell(row[cErrors])),
+    METRICS_BUCKET_COUNT,
+  );
+  const warningsSeries = padSeries(
+    bucketRows.map((row) => numberCell(row[cWarnings])),
+    METRICS_BUCKET_COUNT,
+  );
+  const totalLogsSeries = padSeries(
+    bucketRows.map((row) => numberCell(row[cLogs])),
     METRICS_BUCKET_COUNT,
   );
   const activeIncidentsSeries = padSeries(
@@ -199,7 +212,7 @@ export async function queryMetrics(
     METRICS_BUCKET_COUNT,
   );
 
-  const rangeMs = TIME_RANGE_MS[range];
+  const rangeMs = TIME_RANGE_MS[queryRange];
   const totalLogs = totalsRow ? numberCell(totalsRow[cTotalLogs]) : 0;
   const openErrors = totalsRow ? numberCell(totalsRow[cOpenErrors]) : 0;
   const activeIncidents = totalsRow ? numberCell(totalsRow[cActiveIncidents]) : 0;
@@ -207,19 +220,21 @@ export async function queryMetrics(
   const logsPerMin = rangeMs > 0 ? Math.round((totalLogs / rangeMs) * 60_000) : 0;
 
   return {
-    range,
+    range: queryRange,
     source: "azure",
     openErrors,
     activeIncidents,
     logsPerMin,
     avgResponseMs,
-    openErrorsDeltaPct: deltaFromSeries(openErrorsSeries),
+    openErrorsDeltaPct: deltaFromSeries(errorsSeries),
     avgResponseDeltaPct: deltaFromAverages(avgResponseSeries),
     sparklines: {
-      openErrors: openErrorsSeries,
+      openErrors: errorsSeries,
       activeIncidents: activeIncidentsSeries,
       logsPerMin: logsPerMinSeries,
       avgResponse: avgResponseSeries,
+      totalLogs: totalLogsSeries,
+      warnings: warningsSeries,
     },
   };
 }
@@ -240,6 +255,8 @@ function emptyMetrics(range: TimeRange): LogMetricsResponse {
       activeIncidents: zeros,
       logsPerMin: zeros,
       avgResponse: zeros,
+      totalLogs: zeros,
+      warnings: zeros,
     },
   };
 }

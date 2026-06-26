@@ -13,6 +13,7 @@ import {
   type LogLevel,
   type LogsResponse,
   type LogsSummaryResponse,
+  type LogMetricsResponse,
   type TimeRange,
   TIME_RANGES,
 } from "@/lib/types";
@@ -46,7 +47,7 @@ import { LogDetailPanel } from "./log-detail-panel";
 import { LogFilters, type LogStream } from "./log-filters";
 import { LogsHeader } from "./logs-header";
 import { LogsSidebar, type AppSelection } from "./logs-sidebar";
-import { LogsSummaryCards } from "./logs-summary-cards";
+import { LogsSummaryCards, type SummaryCardSparklines } from "./logs-summary-cards";
 import { LogsTable, type LogsStatus } from "./logs-table";
 import { RecentSignalsPanel } from "./recent-signals-panel";
 import { TestSessionBar } from "./test-session-bar";
@@ -96,6 +97,7 @@ export function LogsView({
   const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [summary, setSummary] = useState<LogsSummaryResponse | null>(null);
+  const [cardSparklines, setCardSparklines] = useState<SummaryCardSparklines | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [nonce, setNonce] = useState(0);
   const [issueStore, setIssueStoreState] = useState<IssueStore>(EMPTY_ISSUE_STORE);
@@ -118,14 +120,32 @@ export function LogsView({
       if (selectedApp !== "all") params.set("app", selectedApp);
       appendTimeWindow(params, testSession);
 
-      const res = await fetch(`/api/logs/summary?${params.toString()}`);
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.error ?? `Summary request failed (${res.status})`);
+      const [summaryRes, metricsRes] = await Promise.all([
+        fetch(`/api/logs/summary?${params.toString()}`),
+        fetch(`/api/logs/metrics?${params.toString()}`),
+      ]);
+
+      if (!summaryRes.ok) {
+        const body = await summaryRes.json().catch(() => ({}));
+        throw new Error(body.error ?? `Summary request failed (${summaryRes.status})`);
       }
-      setSummary((await res.json()) as LogsSummaryResponse);
+
+      setSummary((await summaryRes.json()) as LogsSummaryResponse);
+
+      if (metricsRes.ok) {
+        const metrics = (await metricsRes.json()) as LogMetricsResponse;
+        setCardSparklines({
+          totalLogs: metrics.sparklines.totalLogs,
+          errorsCount: metrics.sparklines.openErrors,
+          warningsCount: metrics.sparklines.warnings,
+          logsPerMinute: metrics.sparklines.logsPerMin,
+        });
+      } else {
+        setCardSparklines(null);
+      }
     } catch {
       setSummary(null);
+      setCardSparklines(null);
     } finally {
       setSummaryLoading(false);
     }
@@ -330,6 +350,7 @@ export function LogsView({
 
         <LogsSummaryCards
           summary={summary}
+          sparklines={cardSparklines}
           loading={status === "loading" || summaryLoading}
           live={live && sessionActive}
           sessionActive={Boolean(testSession)}

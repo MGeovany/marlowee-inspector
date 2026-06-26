@@ -220,6 +220,7 @@ export function buildMetricsQuery(input: BuildSummaryQueryInput): string {
     "let Buckets = Base",
     "| summarize",
     "    Errors = countif(Level == \"ERROR\"),",
+    "    Warnings = countif(Level == \"WARN\"),",
     "    Logs = count(),",
     "    AvgLatencyMs = avgif(LatencyMs, LatencyMs > 0 and LatencyMs < 600000),",
     "    ActiveIncidents = dcountif(ErrorKey, Level == \"ERROR\")",
@@ -232,7 +233,7 @@ export function buildMetricsQuery(input: BuildSummaryQueryInput): string {
     "    AvgResponseMs = avgif(LatencyMs, LatencyMs > 0 and LatencyMs < 600000),",
     "    ActiveIncidents = dcountif(ErrorKey, Level == \"ERROR\");",
     "union",
-    '  (Buckets | project Kind = "bucket", Bucket, Errors, Logs, AvgLatencyMs, ActiveIncidents, OpenErrors = long(null), TotalLogs = long(null), AvgResponseMs = real(null)),',
-    '  (Totals | project Kind = "totals", Bucket = datetime(null), Errors = long(null), Logs = long(null), AvgLatencyMs = real(null), ActiveIncidents, OpenErrors, TotalLogs, AvgResponseMs)',
+    '  (Buckets | project Kind = "bucket", Bucket, Errors, Warnings, Logs, AvgLatencyMs, ActiveIncidents, OpenErrors = long(null), TotalLogs = long(null), AvgResponseMs = real(null)),',
+    '  (Totals | project Kind = "totals", Bucket = datetime(null), Errors = long(null), Warnings = long(null), Logs = long(null), AvgLatencyMs = real(null), ActiveIncidents, OpenErrors, TotalLogs, AvgResponseMs)',
   ].join("\n");
 }
