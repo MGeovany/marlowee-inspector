@@ -1,52 +1,47 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import type { DashboardSummary } from "@/lib/log-stats";
-import { Sparkline } from "./sparkline";
+import type { LogsSummaryResponse } from "@/lib/types";
 
 interface LogsSummaryCardsProps {
-  summary: DashboardSummary;
+  summary: LogsSummaryResponse | null;
   loading: boolean;
   live: boolean;
 }
 
 const CARDS = [
   {
-    key: "openErrors" as const,
-    label: "Open errors",
+    key: "totalLogs" as const,
+    label: "Total logs",
+    tone: "info" as const,
+    accent: "border-l-accent",
+  },
+  {
+    key: "errorsCount" as const,
+    label: "Errors",
     tone: "error" as const,
     accent: "border-l-level-error",
-    sparkKey: "openErrors" as const,
   },
   {
-    key: "activeIncidents" as const,
-    label: "Active incidents",
+    key: "warningsCount" as const,
+    label: "Warnings",
     tone: "warn" as const,
     accent: "border-l-level-warn",
-    sparkKey: "activeIncidents" as const,
   },
   {
-    key: "logsPerMin" as const,
+    key: "logsPerMinute" as const,
     label: "Logs / min",
-    tone: "orange" as const,
-    accent: "border-l-[var(--orange)]",
-    sparkKey: "logsPerMin" as const,
-  },
-  {
-    key: "avgResponse" as const,
-    label: "Avg response",
     tone: "success" as const,
     accent: "border-l-[var(--green)]",
-    sparkKey: "avgResponse" as const,
   },
 ];
 
 export function LogsSummaryCards({ summary, loading, live }: LogsSummaryCardsProps) {
   const values: Record<(typeof CARDS)[number]["key"], string> = {
-    openErrors: String(summary.openErrors),
-    activeIncidents: String(summary.activeIncidents),
-    logsPerMin: summary.logsPerMin.toLocaleString(),
-    avgResponse: `${summary.avgResponseMs} ms`,
+    totalLogs: formatNumber(summary?.totalLogs),
+    errorsCount: formatNumber(summary?.errorsCount),
+    warningsCount: formatNumber(summary?.warningsCount),
+    logsPerMinute: formatNumber(summary?.logsPerMinute),
   };
 
   return (
@@ -59,7 +54,6 @@ export function LogsSummaryCards({ summary, loading, live }: LogsSummaryCardsPro
           accent={card.accent}
           tone={card.tone}
           loading={loading}
-          sparkline={summary.sparklines[card.sparkKey]}
           badge={badgeFor(card.key, summary, live)}
         />
       ))}
@@ -69,28 +63,21 @@ export function LogsSummaryCards({ summary, loading, live }: LogsSummaryCardsPro
 
 function badgeFor(
   key: (typeof CARDS)[number]["key"],
-  summary: DashboardSummary,
+  summary: LogsSummaryResponse | null,
   live: boolean,
 ): { text: string; className: string } | null {
-  if (key === "openErrors" && summary.openErrorsDeltaPct !== null) {
-    const up = summary.openErrorsDeltaPct >= 0;
-    return {
-      text: `${up ? "+" : ""}${summary.openErrorsDeltaPct}%`,
-      className: up ? "text-level-error" : "text-[var(--green)]",
-    };
+  if (!summary) return null;
+  if (key === "totalLogs" && summary.mostNoisyApp) {
+    return { text: `noisy: ${summary.mostNoisyApp}`, className: "text-fg-subtle" };
   }
-  if (key === "activeIncidents" && summary.activeIncidents > 0) {
-    return { text: "active", className: "text-level-warn" };
+  if (key === "errorsCount" && summary.latestError) {
+    return { text: `latest ${formatTime(summary.latestError.timestamp)}`, className: "text-level-error" };
   }
-  if (key === "logsPerMin" && live) {
+  if (key === "warningsCount" && summary.latestWarning) {
+    return { text: `latest ${formatTime(summary.latestWarning.timestamp)}`, className: "text-level-warn" };
+  }
+  if (key === "logsPerMinute" && live) {
     return { text: "live", className: "text-[var(--green)]" };
-  }
-  if (key === "avgResponse" && summary.avgResponseDeltaPct !== null) {
-    const down = summary.avgResponseDeltaPct <= 0;
-    return {
-      text: `${summary.avgResponseDeltaPct > 0 ? "+" : ""}${summary.avgResponseDeltaPct}%`,
-      className: down ? "text-[var(--green)]" : "text-level-warn",
-    };
   }
   return null;
 }
@@ -101,15 +88,13 @@ function MetricCard({
   accent,
   tone,
   loading,
-  sparkline,
   badge,
 }: {
   label: string;
   value: string;
   accent: string;
-  tone: "error" | "warn" | "orange" | "info" | "success";
+  tone: "error" | "warn" | "info" | "success";
   loading: boolean;
-  sparkline: number[];
   badge: { text: string; className: string } | null;
 }) {
   return (
@@ -126,9 +111,23 @@ function MetricCard({
         )}
       </div>
       <div className="mt-2 flex items-end justify-between gap-3">
-        <p className={cn("metric-value", loading && "opacity-50")}>{value}</p>
-        <Sparkline values={sparkline} tone={tone} className="shrink-0" />
+        <p className={cn("metric-value", toneClass(tone), loading && "opacity-50")}>{value}</p>
       </div>
     </div>
   );
+}
+
+function formatNumber(value: number | undefined): string {
+  return typeof value === "number" ? value.toLocaleString() : "--";
+}
+
+function formatTime(timestamp: string): string {
+  return new Date(timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+function toneClass(tone: "error" | "warn" | "info" | "success"): string {
+  if (tone === "error") return "text-level-error";
+  if (tone === "warn") return "text-level-warn";
+  if (tone === "success") return "text-[var(--green)]";
+  return "text-fg";
 }
