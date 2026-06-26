@@ -9,15 +9,14 @@ export function MicrosoftSignInButton({ className }: MicrosoftSignInButtonProps)
     <button
       type="submit"
       className={cn(
-        "group flex w-full items-center justify-center gap-3 rounded-xl border border-white/10 bg-white px-4 py-3",
-        "text-sm font-medium text-zinc-900 shadow-sm transition-all duration-200",
-        "hover:border-white/20 hover:bg-zinc-50 hover:shadow-md",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-elevated",
-        "active:scale-[0.99]",
+        "flex w-full items-center justify-center gap-2.5 rounded-sm border border-border bg-panel px-3 py-2",
+        "text-micro font-medium text-fg transition-colors",
+        "hover:border-border-strong hover:bg-panel-raised",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-soft",
         className,
       )}
     >
-      <MicrosoftLogo className="h-[18px] w-[18px] shrink-0" />
+      <MicrosoftLogo className="h-4 w-4 shrink-0" />
       <span>Continue with Microsoft</span>
     </button>
   );

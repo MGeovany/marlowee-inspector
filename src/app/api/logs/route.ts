@@ -4,14 +4,25 @@ import { auth } from "@/auth";
 import { capabilitiesFor, canReadApp, clampRange, highestRole } from "@/lib/authz";
 import { buildLogsQuery } from "@/lib/queries";
 import { queryLogs } from "@/lib/log-analytics";
-import { maskRows } from "@/lib/masking";
+import { maskRows, maskString } from "@/lib/masking";
+import { queryMockLogs } from "@/lib/mock-logs";
 import { rateLimit } from "@/lib/rate-limit";
 import { audit } from "@/lib/audit";
+
+/**
+ * Mock phase (default): serve the local mock dataset instead of querying Azure.
+ * Azure is only used when explicitly opted into with LOGS_SOURCE=azure, so a
+ * configured workspace id + an active `az login` can never hit real logs by
+ * accident during the UI phase. The full authz/masking/audit/rate-limit
+ * pipeline runs regardless of the data source.
+ */
+const USE_MOCK = process.env.LOGS_SOURCE !== "azure";
 
 const QuerySchema = z.object({
   app: z.string().min(1),
   range: z.enum(["1h", "24h", "7d"]).default("24h"),
   search: z.string().max(256).optional(),
+  level: z.enum(["ERROR", "WARN", "INFO", "DEBUG"]).optional(),
   errorsOnly: z.boolean().default(false),
   raw: z.boolean().default(false),
 });
@@ -38,7 +49,7 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ error: "invalid request", details: parsed.error.flatten() }, { status: 400 });
   }
-  const { app, search, errorsOnly } = parsed.data;
+  const { app, search, errorsOnly, level } = parsed.data;
   const range = clampRange(caps, parsed.data.range);
   const raw = parsed.data.raw && caps.canSeeRaw; // raw only honored for Admin
 
@@ -58,15 +69,23 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // 6. Build + run read-only KQL
+  // 6. Build + run query (mock dataset, or read-only KQL against Azure)
   try {
-    const kql = buildLogsQuery({ app, range, search, errorsOnly });
-    const rows = await queryLogs(kql, range);
+    let masked;
+    if (USE_MOCK) {
+      const rows = queryMockLogs({ app, range, search, errorsOnly, level });
+      // Mask both the message and the raw payload server-side (raw mode = Admin only).
+      masked = raw
+        ? rows
+        : rows.map((r) => ({ ...r, message: maskString(r.message), raw: maskString(r.raw) }));
+    } else {
+      const kql = buildLogsQuery({ app, range, search, errorsOnly });
+      const rows = await queryLogs(kql, range);
+      const filtered = level ? rows.filter((r) => r.level === level) : rows;
+      masked = maskRows(filtered, raw);
+    }
 
-    // 7. Mask server-side
-    const masked = maskRows(rows, raw);
-
-    // 8. Audit
+    // 7. Audit
     audit({
       type: raw ? "raw_search" : "search",
       actor,
@@ -80,8 +99,14 @@ export async function POST(req: NextRequest) {
       rowCount: masked.length,
     });
 
-    // 9. Respond
-    return NextResponse.json({ rows: masked, range, masked: !raw });
+    // 8. Respond
+    return NextResponse.json({
+      rows: masked,
+      range,
+      masked: !raw,
+      source: USE_MOCK ? "mock" : "azure",
+      total: masked.length,
+    });
   } catch (err) {
     return NextResponse.json(
       { error: "query failed", message: err instanceof Error ? err.message : "unknown" },

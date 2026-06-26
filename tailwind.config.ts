@@ -6,21 +6,59 @@ const config: Config = {
     extend: {
       fontFamily: {
         sans: ["var(--font-sans)", "system-ui", "sans-serif"],
+        heading: ["var(--font-heading)", "system-ui", "sans-serif"],
+        mono: [
+          "ui-monospace",
+          "SF Mono",
+          "SFMono-Regular",
+          "Menlo",
+          "Consolas",
+          "monospace",
+        ],
+      },
+      fontSize: {
+        ui: ["13px", { lineHeight: "1.45" }],
+        micro: ["11px", { lineHeight: "1.4" }],
+      },
+      borderRadius: {
+        DEFAULT: "var(--radius)",
+        sm: "var(--radius-sm)",
       },
       colors: {
-        surface: {
-          DEFAULT: "hsl(var(--surface))",
-          elevated: "hsl(var(--surface-elevated))",
-          border: "hsl(var(--surface-border))",
+        bg: "var(--bg)",
+        workspace: "var(--workspace)",
+        sidebar: {
+          DEFAULT: "var(--sidebar)",
+          hover: "var(--sidebar-hover)",
         },
-        ink: {
-          DEFAULT: "hsl(var(--ink))",
-          muted: "hsl(var(--ink-muted))",
-          faint: "hsl(var(--ink-faint))",
+        panel: {
+          DEFAULT: "var(--panel)",
+          raised: "var(--panel-raised)",
+        },
+        border: {
+          DEFAULT: "var(--border)",
+          strong: "var(--border-strong)",
+        },
+        fg: {
+          DEFAULT: "var(--fg)",
+          muted: "var(--fg-muted)",
+          subtle: "var(--fg-subtle)",
+        },
+        accent: {
+          DEFAULT: "var(--accent)",
+          hover: "var(--accent-hover)",
+          soft: "var(--accent-soft)",
+          glow: "var(--accent-glow)",
+        },
+        level: {
+          error: "var(--red)",
+          warn: "var(--yellow)",
+          info: "var(--blue)",
+          debug: "var(--fg-subtle)",
         },
       },
       boxShadow: {
-        glow: "0 0 80px -20px hsl(var(--glow) / 0.35)",
+        accent: "0 0 12px var(--accent-glow)",
       },
     },
   },

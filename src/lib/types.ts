@@ -1,0 +1,59 @@
+/**
+ * Shared domain types for the log viewer. These are the shapes the API returns
+ * and the UI consumes; they are deliberately decoupled from the Azure SDK row
+ * shape (see lib/log-analytics.ts) so the mock phase and the real phase agree.
+ */
+
+export type LogLevel = "ERROR" | "WARN" | "INFO" | "DEBUG";
+
+export type ContainerApp = "ca-data-api" | "ca-dashboard" | "ca-onboarding" | "ca-admin";
+
+export type TimeRange = "1h" | "24h" | "7d";
+
+/** A single log line, enriched with the fields the detail sheet needs. */
+export interface LogEntry {
+  id: string;
+  timeGenerated: string; // ISO 8601
+  app: ContainerApp;
+  level: LogLevel;
+  message: string;
+  revision: string; // e.g. ca-data-api--0007
+  replica: string; // e.g. ca-data-api-7c9f6b8d4-abcde
+  stream: "stdout" | "stderr";
+  requestId?: string;
+  /** Full raw log payload (structured JSON or plain text) shown in the detail sheet. */
+  raw: string;
+}
+
+/** Filter state owned by the client and sent to /api/logs. */
+export interface LogFilters {
+  app: ContainerApp;
+  level: LogLevel | "ALL";
+  search: string;
+  timeRange: TimeRange;
+  errorsOnly: boolean;
+}
+
+export interface LogsResponse {
+  rows: LogEntry[];
+  total: number;
+  range: TimeRange;
+  masked: boolean;
+  source: "mock" | "azure";
+}
+
+export const LOG_LEVELS: LogLevel[] = ["ERROR", "WARN", "INFO", "DEBUG"];
+export const TIME_RANGES: TimeRange[] = ["1h", "24h", "7d"];
+export const ALL_APPS: ContainerApp[] = ["ca-data-api", "ca-dashboard", "ca-onboarding", "ca-admin"];
+
+export const TIME_RANGE_LABEL: Record<TimeRange, string> = {
+  "1h": "1h",
+  "24h": "24h",
+  "7d": "7d",
+};
+
+export const TIME_RANGE_MS: Record<TimeRange, number> = {
+  "1h": 60 * 60 * 1000,
+  "24h": 24 * 60 * 60 * 1000,
+  "7d": 7 * 24 * 60 * 60 * 1000,
+};

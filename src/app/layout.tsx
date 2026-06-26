@@ -1,9 +1,16 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Michroma, Urbanist } from "next/font/google";
 
 import "./globals.css";
 
-const inter = Inter({
+const michroma = Michroma({
+  subsets: ["latin"],
+  weight: "400",
+  variable: "--font-heading",
+  display: "swap",
+});
+
+const urbanist = Urbanist({
   subsets: ["latin"],
   variable: "--font-sans",
   display: "swap",
@@ -16,7 +23,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={inter.variable}>
+    <html lang="en" className={`${michroma.variable} ${urbanist.variable}`}>
       <body className="min-h-dvh font-sans">{children}</body>
     </html>
   );
