@@ -1,4 +1,4 @@
-import { TIME_RANGE_MS, type ContainerApp, type LogEntry, type TimeRange } from "./types";
+import { TIME_RANGE_MS, type ContainerApp, type LogEntry, type LogMetricsResponse, type TimeRange } from "./types";
 
 export type AppHealth = "healthy" | "warning" | "error";
 
@@ -189,6 +189,18 @@ export function computeAppStats(rows: LogEntry[], app: ContainerApp): AppStats {
     errors,
     warnings,
     health: appHealth(errors, warnings),
+  };
+}
+
+export function metricsToDashboardSummary(metrics: LogMetricsResponse): DashboardSummary {
+  return {
+    openErrors: metrics.openErrors,
+    activeIncidents: metrics.activeIncidents,
+    logsPerMin: metrics.logsPerMin,
+    avgResponseMs: metrics.avgResponseMs,
+    openErrorsDeltaPct: metrics.openErrorsDeltaPct,
+    avgResponseDeltaPct: metrics.avgResponseDeltaPct,
+    sparklines: metrics.sparklines,
   };
 }
 

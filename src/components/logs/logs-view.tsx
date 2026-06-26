@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   computeAppStats,
   computeSidePanel,
-  computeSummary,
+  metricsToDashboardSummary,
   filterLogRows,
   relatedLogs,
 } from "@/lib/log-stats";
@@ -13,6 +13,7 @@ import {
   type ContainerApp,
   type LogEntry,
   type LogLevel,
+  type LogMetricsResponse,
   type LogsResponse,
   type TimeRange,
   TIME_RANGES,
@@ -63,8 +64,8 @@ export function LogsView({
   const [source, setSource] = useState<"mock" | "azure">("azure");
   const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
-  const [queryLatencyMs, setQueryLatencyMs] = useState(0);
-  const [latencyHistory, setLatencyHistory] = useState<number[]>([]);
+  const [metrics, setMetrics] = useState<LogMetricsResponse | null>(null);
+  const [metricsLoading, setMetricsLoading] = useState(false);
   const [nonce, setNonce] = useState(0);
 
   const [detailEntry, setDetailEntry] = useState<LogEntry | null>(null);
@@ -72,45 +73,62 @@ export function LogsView({
   const fetchLogs = useCallback(async () => {
     if (allowedApps.length === 0) return;
     setStatus("loading");
-    const started = performance.now();
+    setMetricsLoading(true);
 
     try {
-      const results = await Promise.all(
-        allowedApps.map(async (app) => {
-          const params = new URLSearchParams({
-            app,
-            range: timeRange,
-            stream,
-            raw: String(raw),
-            errorsOnly: String(errorsOnly),
-            limit: "300",
-          });
-          if (search.trim()) params.set("search", search.trim());
-          if (level !== "ALL") params.set("level", level);
+      const logParams = allowedApps.map((app) => {
+        const params = new URLSearchParams({
+          app,
+          range: timeRange,
+          stream,
+          raw: String(raw),
+          errorsOnly: String(errorsOnly),
+          limit: "300",
+        });
+        if (search.trim()) params.set("search", search.trim());
+        if (level !== "ALL") params.set("level", level);
+        return fetch(`/api/logs?${params.toString()}`);
+      });
 
-          const res = await fetch(`/api/logs?${params.toString()}`);
-          if (!res.ok) {
-            const body = await res.json().catch(() => ({}));
-            throw new Error(body.error ?? `Request failed (${res.status})`);
-          }
-          return res.json() as Promise<LogsResponse>;
-        }),
-      );
+      const metricsParams = new URLSearchParams({ range: timeRange });
+      const results = await Promise.all([
+        ...logParams,
+        fetch(`/api/logs/metrics?${metricsParams.toString()}`),
+      ]);
 
-      const merged = results.flatMap((r) => r.rows);
+      const metricsRes = results[results.length - 1];
+      const logResponses = results.slice(0, -1);
+
+      for (const res of logResponses) {
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body.error ?? `Request failed (${res.status})`);
+        }
+      }
+
+      if (!metricsRes.ok) {
+        const body = await metricsRes.json().catch(() => ({}));
+        throw new Error(body.error ?? `Metrics request failed (${metricsRes.status})`);
+      }
+
+      const parsedLogs = await Promise.all(logResponses.map((res) => res.json() as Promise<LogsResponse>));
+      const parsedMetrics = (await metricsRes.json()) as LogMetricsResponse;
+
+      const merged = parsedLogs.flatMap((r) => r.rows);
       merged.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
 
       setAllRows(merged);
-      setMasked(results[0]?.masked ?? true);
-      setSource(results[0]?.source ?? "mock");
-      setQueryLatencyMs(Math.round(performance.now() - started));
-      setLatencyHistory((prev) => [...prev.slice(-13), Math.round(performance.now() - started)]);
+      setMasked(parsedLogs[0]?.masked ?? true);
+      setSource(parsedLogs[0]?.source ?? "azure");
+      setMetrics(parsedMetrics);
       setLastRefresh(new Date());
       setError(null);
       setStatus("success");
     } catch (e) {
       setError(e instanceof Error ? e.message : "unknown error");
       setStatus("error");
+    } finally {
+      setMetricsLoading(false);
     }
   }, [allowedApps, timeRange, stream, raw, errorsOnly, level, search]);
 
@@ -142,10 +160,25 @@ export function LogsView({
     [allRows, allowedApps],
   );
 
-  const summary = useMemo(
-    () => computeSummary(allRows, timeRange, queryLatencyMs, latencyHistory),
-    [allRows, timeRange, queryLatencyMs, latencyHistory],
-  );
+  const summary = useMemo(() => {
+    if (metrics) return metricsToDashboardSummary(metrics);
+    return metricsToDashboardSummary({
+      range: timeRange,
+      source: "azure",
+      openErrors: 0,
+      activeIncidents: 0,
+      logsPerMin: 0,
+      avgResponseMs: 0,
+      openErrorsDeltaPct: null,
+      avgResponseDeltaPct: null,
+      sparklines: {
+        openErrors: [],
+        activeIncidents: [],
+        logsPerMin: [],
+        avgResponse: [],
+      },
+    });
+  }, [metrics, timeRange]);
 
   const sidePanel = useMemo(() => computeSidePanel(allRows), [allRows]);
 
@@ -193,7 +226,11 @@ export function LogsView({
           masked={masked}
         />
 
-        <LogsSummaryCards summary={summary} loading={status === "loading"} live={live} />
+        <LogsSummaryCards
+          summary={summary}
+          loading={status === "loading" || metricsLoading}
+          live={live}
+        />
 
         <div className="relative flex min-h-0 flex-1 overflow-hidden">
           <div className="flex min-w-0 flex-1 flex-col">

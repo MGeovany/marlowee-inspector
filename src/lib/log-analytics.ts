@@ -1,7 +1,13 @@
 import { DefaultAzureCredential } from "@azure/identity";
 import { Durations, LogsQueryClient, LogsQueryResultStatus } from "@azure/monitor-query";
 import type { TimeRange } from "./authz";
-import type { ContainerApp, LogEntry, LogLevel } from "./types";
+import {
+  buildMetricsQuery,
+  METRICS_BUCKET_COUNT,
+  metricsBinMinutes,
+} from "./queries";
+import type { ContainerApp, LogEntry, LogLevel, LogMetricsResponse } from "./types";
+import { TIME_RANGE_MS } from "./types";
 
 /**
  * Log Analytics access via the app's own identity. Local dev uses `az login`
@@ -112,4 +118,128 @@ function stringifyCell(value: unknown): string {
   if (value instanceof Date) return value.toISOString();
   if (typeof value === "object") return JSON.stringify(value);
   return String(value);
+}
+
+function numberCell(value: unknown): number {
+  if (value == null || value === "") return 0;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function padSeries(values: number[], size: number): number[] {
+  if (values.length >= size) return values.slice(-size);
+  return [...Array(size - values.length).fill(0), ...values];
+}
+
+function deltaPct(recent: number, prior: number): number | null {
+  if (prior === 0) return recent > 0 ? 100 : null;
+  return Math.round(((recent - prior) / prior) * 100);
+}
+
+function deltaFromSeries(values: number[]): number | null {
+  const mid = Math.floor(values.length / 2);
+  const recent = values.slice(mid).reduce((sum, v) => sum + v, 0);
+  const prior = values.slice(0, mid).reduce((sum, v) => sum + v, 0);
+  return deltaPct(recent, prior);
+}
+
+function deltaFromAverages(values: number[]): number | null {
+  const mid = Math.floor(values.length / 2);
+  const recent = values.slice(mid).filter((v) => v > 0);
+  const prior = values.slice(0, mid).filter((v) => v > 0);
+  const recentAvg =
+    recent.length > 0 ? recent.reduce((sum, v) => sum + v, 0) / recent.length : 0;
+  const priorAvg =
+    prior.length > 0 ? prior.reduce((sum, v) => sum + v, 0) / prior.length : 0;
+  return deltaPct(recentAvg, priorAvg);
+}
+
+/**
+ * Runs a bucketed KQL aggregate against Log Analytics for dashboard sparklines.
+ * Unlike /api/logs, this scans the full time window (no row cap).
+ */
+export async function queryMetrics(
+  apps: ContainerApp[],
+  range: TimeRange,
+): Promise<LogMetricsResponse> {
+  const kql = buildMetricsQuery({ apps, range });
+  const table = await queryLogAnalyticsTable(kql, range);
+  if (!table) {
+    return emptyMetrics(range);
+  }
+
+  const idx = (name: string) => table.columnNames.findIndex((c) => c === name);
+  const cKind = idx("Kind");
+  const cErrors = idx("Errors");
+  const cLogs = idx("Logs");
+  const cAvgLatency = idx("AvgLatencyMs");
+  const cActiveIncidents = idx("ActiveIncidents");
+  const cOpenErrors = idx("OpenErrors");
+  const cTotalLogs = idx("TotalLogs");
+  const cAvgResponse = idx("AvgResponseMs");
+
+  const bucketRows = table.rows.filter((row) => stringifyCell(row[cKind]) === "bucket");
+  const totalsRow = table.rows.find((row) => stringifyCell(row[cKind]) === "totals");
+
+  const binMinutes = metricsBinMinutes(range);
+  const openErrorsSeries = padSeries(
+    bucketRows.map((row) => numberCell(row[cErrors])),
+    METRICS_BUCKET_COUNT,
+  );
+  const activeIncidentsSeries = padSeries(
+    bucketRows.map((row) => numberCell(row[cActiveIncidents])),
+    METRICS_BUCKET_COUNT,
+  );
+  const logsPerMinSeries = padSeries(
+    bucketRows.map((row) => Math.round(numberCell(row[cLogs]) / binMinutes)),
+    METRICS_BUCKET_COUNT,
+  );
+  const avgResponseSeries = padSeries(
+    bucketRows.map((row) => Math.round(numberCell(row[cAvgLatency]))),
+    METRICS_BUCKET_COUNT,
+  );
+
+  const rangeMs = TIME_RANGE_MS[range];
+  const totalLogs = totalsRow ? numberCell(totalsRow[cTotalLogs]) : 0;
+  const openErrors = totalsRow ? numberCell(totalsRow[cOpenErrors]) : 0;
+  const activeIncidents = totalsRow ? numberCell(totalsRow[cActiveIncidents]) : 0;
+  const avgResponseMs = totalsRow ? Math.round(numberCell(totalsRow[cAvgResponse])) : 0;
+  const logsPerMin = rangeMs > 0 ? Math.round((totalLogs / rangeMs) * 60_000) : 0;
+
+  return {
+    range,
+    source: "azure",
+    openErrors,
+    activeIncidents,
+    logsPerMin,
+    avgResponseMs,
+    openErrorsDeltaPct: deltaFromSeries(openErrorsSeries),
+    avgResponseDeltaPct: deltaFromAverages(avgResponseSeries),
+    sparklines: {
+      openErrors: openErrorsSeries,
+      activeIncidents: activeIncidentsSeries,
+      logsPerMin: logsPerMinSeries,
+      avgResponse: avgResponseSeries,
+    },
+  };
+}
+
+function emptyMetrics(range: TimeRange): LogMetricsResponse {
+  const zeros = Array.from({ length: METRICS_BUCKET_COUNT }, () => 0);
+  return {
+    range,
+    source: "azure",
+    openErrors: 0,
+    activeIncidents: 0,
+    logsPerMin: 0,
+    avgResponseMs: 0,
+    openErrorsDeltaPct: null,
+    avgResponseDeltaPct: null,
+    sparklines: {
+      openErrors: zeros,
+      activeIncidents: zeros,
+      logsPerMin: zeros,
+      avgResponse: zeros,
+    },
+  };
 }

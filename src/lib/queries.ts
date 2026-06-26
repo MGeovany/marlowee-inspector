@@ -53,6 +53,25 @@ export interface BuildSummaryQueryInput {
   range: TimeRange; // duration is applied by the SDK; kept here for clarity
 }
 
+export const METRICS_BUCKET_COUNT = 14;
+
+const METRICS_BIN: Record<TimeRange, string> = {
+  "1h": "4m",
+  "24h": "1h",
+  "7d": "12h",
+};
+
+export function metricsBinMinutes(range: TimeRange): number {
+  switch (range) {
+    case "1h":
+      return 4;
+    case "24h":
+      return 60;
+    case "7d":
+      return 12 * 60;
+  }
+}
+
 const ERROR_TERMS = ["ERROR", "Error", "exception", "Exception", "FATAL", "panic", "stacktrace"];
 
 export function buildLogsQuery(input: BuildQueryInput): string {
@@ -142,5 +161,50 @@ export function buildLogsSummaryQuery(input: BuildSummaryQueryInput): string {
     `  (Base | summarize Count = count() by App | top 1 by Count desc | project Kind = "mostNoisyApp", Key = App, Count, TotalLogs = long(null), ErrorsCount = long(null), WarningsCount = long(null), LastLogTimestamp = datetime(null), App = "", Level = "", TimeGenerated = datetime(null), Message = "", Revision = "", Replica = "", Stream = ""),`,
     `  (Base | where Level == "ERROR" | top 1 by TimeGenerated desc | project Kind = "latestError", Key = "", ${nullMetrics}, App, Level, TimeGenerated, Message, Revision, Replica, Stream),`,
     `  (Base | where Level == "WARN" | top 1 by TimeGenerated desc | project Kind = "latestWarning", Key = "", ${nullMetrics}, App, Level, TimeGenerated, Message, Revision, Replica, Stream)`,
+  ].join("\n");
+}
+
+/** Time-bucketed aggregates for dashboard sparklines (full workspace scan, not row-limited). */
+export function buildMetricsQuery(input: BuildSummaryQueryInput): string {
+  const apps = input.apps.filter((app) => (ALLOWED_APPS as readonly string[]).includes(app));
+  if (apps.length === 0) throw new Error("No allowed apps for metrics query");
+
+  const appList = apps.map((app) => `"${escapeKql(app)}"`).join(", ");
+  const errorTerms = ERROR_TERMS.map((term) => `"${term}"`).join(", ");
+  const binSize = METRICS_BIN[input.range];
+
+  return [
+    `let AllowedApps = dynamic([${appList}]);`,
+    `let BinSize = ${binSize};`,
+    `let Base = ${CONSOLE_TABLE}`,
+    '| extend App = tostring(column_ifexists("ContainerAppName_s", ""))',
+    '| extend Message = tostring(column_ifexists("Log_s", ""))',
+    '| extend Stream = tolower(tostring(column_ifexists("Stream_s", "stdout")))',
+    "| where App in (AllowedApps)",
+    "| extend Level = case(" +
+      `Message has_any (${errorTerms}), "ERROR", ` +
+      'Message has_any ("WARN","WARNING"), "WARN", ' +
+      'Message has "INFO", "INFO", ' +
+      '"LOG")',
+    '| extend LatencyMs = tolong(extract(@"(\\d+)\\s*ms", 1, Message))',
+    '| extend ErrorKey = iif(Level == "ERROR", strcat(App, ":", iif(strlen(Message) > 56, substring(Message, 0, 53), Message)), "")',
+    ";",
+    "let Buckets = Base",
+    "| summarize",
+    "    Errors = countif(Level == \"ERROR\"),",
+    "    Logs = count(),",
+    "    AvgLatencyMs = avgif(LatencyMs, LatencyMs > 0 and LatencyMs < 600000),",
+    "    ActiveIncidents = dcountif(ErrorKey, Level == \"ERROR\")",
+    "  by Bucket = bin(TimeGenerated, BinSize)",
+    "| order by Bucket asc;",
+    "let Totals = Base",
+    "| summarize",
+    "    OpenErrors = countif(Level == \"ERROR\"),",
+    "    TotalLogs = count(),",
+    "    AvgResponseMs = avgif(LatencyMs, LatencyMs > 0 and LatencyMs < 600000),",
+    "    ActiveIncidents = dcountif(ErrorKey, Level == \"ERROR\");",
+    "union",
+    '  (Buckets | project Kind = "bucket", Bucket, Errors, Logs, AvgLatencyMs, ActiveIncidents, OpenErrors = long(null), TotalLogs = long(null), AvgResponseMs = real(null)),',
+    '  (Totals | project Kind = "totals", Bucket = datetime(null), Errors = long(null), Logs = long(null), AvgLatencyMs = real(null), ActiveIncidents, OpenErrors, TotalLogs, AvgResponseMs)',
   ].join("\n");
 }

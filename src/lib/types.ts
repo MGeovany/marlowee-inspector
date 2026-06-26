@@ -61,6 +61,24 @@ export interface LogsSummaryResponse {
   source: "azure";
 }
 
+/** Time-bucketed metrics returned by /api/logs/metrics (Azure KQL aggregates). */
+export interface LogMetricsResponse {
+  range: TimeRange;
+  source: "azure";
+  openErrors: number;
+  activeIncidents: number;
+  logsPerMin: number;
+  avgResponseMs: number;
+  openErrorsDeltaPct: number | null;
+  avgResponseDeltaPct: number | null;
+  sparklines: {
+    openErrors: number[];
+    activeIncidents: number[];
+    logsPerMin: number[];
+    avgResponse: number[];
+  };
+}
+
 // Levels offered in the filter dropdown — the set Azure detection produces.
 export const LOG_LEVELS: LogLevel[] = ["ERROR", "WARN", "INFO", "LOG"];
 export const TIME_RANGES: TimeRange[] = ["1h", "24h", "7d"];
