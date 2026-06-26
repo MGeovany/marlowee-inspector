@@ -27,15 +27,21 @@ export function playErrorAlertSound(): void {
 
   lastSoundAt = now;
 
-  const playTone = (frequency: number, startOffset: number, duration: number) => {
+  const playTone = (
+    frequency: number,
+    startOffset: number,
+    duration: number,
+    peakGain = 0.22,
+    type: OscillatorType = "sine",
+  ) => {
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     const start = ctx.currentTime + startOffset;
 
-    osc.type = "sine";
+    osc.type = type;
     osc.frequency.value = frequency;
     gain.gain.setValueAtTime(0.0001, start);
-    gain.gain.exponentialRampToValueAtTime(0.07, start + 0.015);
+    gain.gain.exponentialRampToValueAtTime(peakGain, start + 0.02);
     gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
 
     osc.connect(gain);
@@ -45,8 +51,9 @@ export function playErrorAlertSound(): void {
   };
 
   void ctx.resume().then(() => {
-    playTone(659.25, 0, 0.11);
-    playTone(880, 0.13, 0.16);
+    playTone(659.25, 0, 0.12, 0.24);
+    playTone(880, 0.11, 0.18, 0.28);
+    playTone(1174.66, 0.24, 0.14, 0.2, "triangle");
   }).catch(() => {
     /* autoplay blocked until user interacts */
   });
@@ -56,6 +63,10 @@ function truncateMessage(message: string, max = 96): string {
   const line = message.split("\n")[0].trim();
   if (line.length <= max) return line;
   return `${line.slice(0, max - 1)}…`;
+}
+
+export function clearAllErrorNotifications(): void {
+  toast.dismiss();
 }
 
 export function notifyNewErrors(
@@ -73,11 +84,14 @@ export function notifyNewErrors(
     toast.error(`New error · ${entry.app}`, {
       id: `error-${entry.id}`,
       description: truncateMessage(entry.message),
-      duration: 8000,
+      duration: Infinity,
       action: onView
         ? {
             label: "View",
-            onClick: () => onView(entry),
+            onClick: () => {
+              onView(entry);
+              toast.dismiss(`error-${entry.id}`);
+            },
           }
         : undefined,
     });
@@ -87,7 +101,19 @@ export function notifyNewErrors(
   if (remaining > 0) {
     toast.message(`${remaining} more new error${remaining === 1 ? "" : "s"}`, {
       id: `error-batch-${sorted[0]?.id ?? "batch"}`,
-      duration: 5000,
+      duration: Infinity,
     });
   }
+
+  toast.message(
+    `${sorted.length} new error${sorted.length === 1 ? "" : "s"}`,
+    {
+      id: "error-clear-all",
+      duration: Infinity,
+      action: {
+        label: "Clear all",
+        onClick: clearAllErrorNotifications,
+      },
+    },
+  );
 }

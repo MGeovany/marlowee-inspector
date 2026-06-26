@@ -32,6 +32,7 @@ export interface IssueNote {
   fingerprint: string;
   logId?: string;
   text: string;
+  author?: string;
   createdAt: string;
 }
 

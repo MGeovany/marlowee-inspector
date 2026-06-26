@@ -18,6 +18,19 @@ export interface IssueStore {
   notes: IssueNote[];
 }
 
+function mapNoteRow(row: typeof logAnnotations.$inferSelect): IssueNote {
+  return {
+    id: row.id,
+    target: row.target as "log" | "issue",
+    targetId: row.targetId,
+    fingerprint: row.fingerprint,
+    logId: row.logId ?? undefined,
+    text: row.text,
+    author: row.author ?? undefined,
+    createdAt: row.createdAt,
+  };
+}
+
 function randomId(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
   return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -63,15 +76,7 @@ export async function getIssueStore(): Promise<IssueStore> {
     };
   }
 
-  const notes: IssueNote[] = allNotes.map((row) => ({
-    id: row.id,
-    target: row.target as "log" | "issue",
-    targetId: row.targetId,
-    fingerprint: row.fingerprint,
-    logId: row.logId ?? undefined,
-    text: row.text,
-    createdAt: row.createdAt,
-  }));
+  const notes: IssueNote[] = allNotes.map(mapNoteRow);
 
   return { issues, hiddenLogs, notes };
 }
@@ -206,6 +211,7 @@ export async function addNote(note: {
     fingerprint: note.fingerprint,
     logId: note.logId,
     text: note.text,
+    author: note.author,
     createdAt: now,
   };
 }
@@ -219,15 +225,7 @@ export async function listNotesForIssue(fingerprint: string): Promise<IssueNote[
     .orderBy(desc(logAnnotations.createdAt))
     .all();
 
-  return rows.map((row) => ({
-    id: row.id,
-    target: row.target as "log" | "issue",
-    targetId: row.targetId,
-    fingerprint: row.fingerprint,
-    logId: row.logId ?? undefined,
-    text: row.text,
-    createdAt: row.createdAt,
-  }));
+  return rows.map(mapNoteRow);
 }
 
 export async function listNotesForLog(logId: string): Promise<IssueNote[]> {
@@ -239,15 +237,7 @@ export async function listNotesForLog(logId: string): Promise<IssueNote[]> {
     .orderBy(desc(logAnnotations.createdAt))
     .all();
 
-  return rows.map((row) => ({
-    id: row.id,
-    target: row.target as "log" | "issue",
-    targetId: row.targetId,
-    fingerprint: row.fingerprint,
-    logId: row.logId ?? undefined,
-    text: row.text,
-    createdAt: row.createdAt,
-  }));
+  return rows.map(mapNoteRow);
 }
 
 export async function listRecentNotes(limit = 20): Promise<IssueNote[]> {
@@ -259,15 +249,18 @@ export async function listRecentNotes(limit = 20): Promise<IssueNote[]> {
     .limit(limit)
     .all();
 
-  return rows.map((row) => ({
-    id: row.id,
-    target: row.target as "log" | "issue",
-    targetId: row.targetId,
-    fingerprint: row.fingerprint,
-    logId: row.logId ?? undefined,
-    text: row.text,
-    createdAt: row.createdAt,
-  }));
+  return rows.map(mapNoteRow);
+}
+
+export async function listAllNotes(): Promise<IssueNote[]> {
+  const db = getDb();
+  const rows = db
+    .select()
+    .from(logAnnotations)
+    .orderBy(desc(logAnnotations.createdAt))
+    .all();
+
+  return rows.map(mapNoteRow);
 }
 
 // Session operations
@@ -313,6 +306,10 @@ export async function createSession(data: {
 }) {
   const db = getDb();
   const now = new Date().toISOString();
+  db.update(testSessions)
+    .set({ status: "stopped", stoppedAt: now, updatedAt: now })
+    .where(eq(testSessions.status, "active"))
+    .run();
   db.insert(testSessions)
     .values({
       id: data.id,
@@ -323,6 +320,11 @@ export async function createSession(data: {
       updatedAt: now,
     })
     .run();
+}
+
+export async function deleteSession(id: string) {
+  const db = getDb();
+  db.delete(testSessions).where(eq(testSessions.id, id)).run();
 }
 
 export async function updateSession(

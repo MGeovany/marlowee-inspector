@@ -1,4 +1,4 @@
-import type { IssueStatus, IssueStore } from "./issues";
+import type { IssueStatus, IssueStore, IssueRecord, HiddenLogRecord, IssueNote } from "./issues";
 import type { TestSession } from "./test-session";
 import type { ContainerApp, LogLevel } from "./types";
 
@@ -77,6 +77,21 @@ export async function updateSessionApi(
   });
 }
 
+export interface SessionsResponse {
+  active: TestSession | null;
+  sessions: TestSession[];
+}
+
+export async function fetchSessionsApi(): Promise<SessionsResponse> {
+  const res = await fetch("/api/sessions");
+  if (!res.ok) throw new Error("Failed to load sessions");
+  return res.json();
+}
+
+export async function deleteSessionApi(id: string): Promise<void> {
+  await fetch(`/api/sessions/${id}`, { method: "DELETE" });
+}
+
 export async function hideLogEntryApi(data: {
   logId: string;
   fingerprint: string;
@@ -95,4 +110,53 @@ export async function reopenLogEntryApi(logId: string): Promise<void> {
   await fetch(`/api/hidden/${logId}`, {
     method: "DELETE",
   });
+}
+
+export async function fetchIssuesApi(statuses: IssueStatus[]): Promise<IssueRecord[]> {
+  const params = new URLSearchParams({ status: statuses.join(",") });
+  const res = await fetch(`/api/issues?${params}`);
+  if (!res.ok) throw new Error("Failed to load issues");
+  return res.json();
+}
+
+export async function fetchHiddenLogsApi(): Promise<HiddenLogRecord[]> {
+  const res = await fetch("/api/hidden");
+  if (!res.ok) throw new Error("Failed to load hidden logs");
+  return res.json();
+}
+
+export interface SuppressionRule {
+  id: string;
+  pattern: string;
+  app?: string;
+  level?: string;
+  endpoint?: string;
+  reason?: string;
+  createdBy?: string;
+  createdAt: string;
+}
+
+export async function fetchSuppressionsApi(): Promise<SuppressionRule[]> {
+  const res = await fetch("/api/suppressions");
+  if (!res.ok) throw new Error("Failed to load suppressions");
+  return res.json();
+}
+
+export async function deleteSuppressionApi(id: string): Promise<void> {
+  await fetch(`/api/suppressions/${id}`, { method: "DELETE" });
+}
+
+export async function fetchAnnotationsApi(options?: {
+  all?: boolean;
+  fingerprint?: string;
+  logId?: string;
+}): Promise<IssueNote[]> {
+  const params = new URLSearchParams();
+  if (options?.all) params.set("all", "true");
+  if (options?.fingerprint) params.set("fingerprint", options.fingerprint);
+  if (options?.logId) params.set("logId", options.logId);
+  const qs = params.toString();
+  const res = await fetch(`/api/annotations${qs ? `?${qs}` : ""}`);
+  if (!res.ok) throw new Error("Failed to load annotations");
+  return res.json();
 }

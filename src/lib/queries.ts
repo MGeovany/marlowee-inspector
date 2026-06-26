@@ -166,6 +166,52 @@ export function buildLogsQuery(input: BuildQueryInput): string {
   return lines.join("\n");
 }
 
+export function buildSystemLogsQuery(input: BuildQueryInput): string {
+  if (!(ALLOWED_APPS as readonly string[]).includes(input.app)) {
+    throw new Error(`App not allowed: ${input.app}`);
+  }
+  const limit = Math.min(Math.max(input.limit ?? DEFAULT_ROWS, 1), MAX_ROWS);
+  const lines: string[] = [
+    SYSTEM_TABLE,
+    '| extend App = tostring(column_ifexists("ContainerAppName_s", ""))',
+    '| extend LogText = tostring(column_ifexists("Log_s", ""))',
+    '| extend Reason = tostring(column_ifexists("Reason_s", ""))',
+    '| extend EventType = tostring(column_ifexists("Type_s", ""))',
+    '| extend Revision = tostring(column_ifexists("RevisionName_s", ""))',
+    '| extend Replica = coalesce(tostring(column_ifexists("ReplicaName_s", "")), tostring(column_ifexists("ContainerName_s", "")))',
+    '| extend Message = strcat(LogText, iif(isnotempty(Reason), strcat(" — ", Reason), ""))',
+    `| where App == "${escapeKql(input.app)}"`,
+    ...kqlTimeWindowLines(input.timeWindow),
+  ];
+
+  if (input.search && input.search.trim().length > 0) {
+    lines.push(`| where Message contains "${escapeKql(input.search)}"`);
+  }
+
+  lines.push(
+    "| extend Level = case(" +
+      'EventType has_any ("Error", "Failed", "Failure"), "ERROR", ' +
+      'EventType has_any ("Warning", "Warn"), "WARN", ' +
+      'EventType has_any ("Normal", "Info"), "INFO", ' +
+      '"LOG")',
+    '| extend Stream = "system"',
+  );
+
+  if (input.errorsOnly) {
+    lines.push('| where Level == "ERROR"');
+  } else if (input.level) {
+    lines.push(`| where Level == "${escapeKql(input.level)}"`);
+  }
+
+  lines.push(
+    "| project TimeGenerated, App, Level, Stream, Message, Revision, Replica, RawPayload = Message",
+    "| order by TimeGenerated desc",
+    `| take ${limit}`,
+  );
+
+  return lines.join("\n");
+}
+
 export function buildLogsSummaryQuery(input: BuildSummaryQueryInput): string {
   const apps = input.apps.filter((app) => (ALLOWED_APPS as readonly string[]).includes(app));
   if (apps.length === 0) throw new Error("No allowed apps for summary query");

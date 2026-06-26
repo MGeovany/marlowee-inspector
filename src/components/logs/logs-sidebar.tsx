@@ -15,7 +15,6 @@ import {
   MessageSquareText,
   Radio,
   ScrollText,
-  Search,
   Server,
   ShieldCheck,
 } from "lucide-react";
@@ -40,17 +39,16 @@ const NAV_SECTIONS: { title: string; items: NavItemDef[] }[] = [
     items: [
       { label: "Overview", icon: Layers, href: "/overview" },
       { label: "Live Logs", icon: Radio, href: "/logs" },
-      { label: "Test Sessions", icon: ListChecks, href: "/logs", disabled: true },
-      { label: "Search", icon: Search, href: "/logs", disabled: true },
+      { label: "Test Sessions", icon: ListChecks, href: "/sessions" },
     ],
   },
   {
     title: "Triage",
     items: [
-      { label: "Issues", icon: FileSearch, href: "/logs", disabled: true },
-      { label: "Resolved", icon: Archive, href: "/logs", disabled: true },
-      { label: "Hidden / Suppressed", icon: EyeOff, href: "/logs", disabled: true },
-      { label: "Notes", icon: MessageSquareText, href: "/logs", disabled: true },
+      { label: "Issues", icon: FileSearch, href: "/issues" },
+      { label: "Resolved", icon: Archive, href: "/resolved" },
+      { label: "Hidden / Suppressed", icon: EyeOff, href: "/hidden" },
+      { label: "Notes", icon: MessageSquareText, href: "/notes" },
     ],
   },
   {
@@ -187,6 +185,11 @@ function NavItem({ item, pathname }: { item: NavItemDef; pathname: string }) {
 
 function isNavActive(pathname: string, href: string, label: string): boolean {
   if (label === "Live Logs") return pathname === "/logs";
+  if (label === "Test Sessions") return pathname === "/sessions";
+  if (label === "Issues") return pathname === "/issues";
+  if (label === "Resolved") return pathname === "/resolved";
+  if (label === "Hidden / Suppressed") return pathname === "/hidden";
+  if (label === "Notes") return pathname === "/notes";
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 

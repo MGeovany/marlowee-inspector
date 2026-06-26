@@ -49,6 +49,7 @@ import {
   updateSessionApi,
   hideLogEntryApi,
   reopenLogEntryApi,
+  fetchSessionsApi,
 } from "@/lib/api";
 import { LogDetailPanel } from "./log-detail-panel";
 import { LogFilters, type LogStream } from "./log-filters";
@@ -65,6 +66,7 @@ interface LogsViewProps {
   userEmail: string | null;
   maxRange: TimeRange;
   signOutAction: () => Promise<void>;
+  initialSessionId?: string;
 }
 
 const LIVE_INTERVAL_MS = 15_000;
@@ -85,6 +87,7 @@ export function LogsView({
   userEmail,
   maxRange,
   signOutAction,
+  initialSessionId,
 }: LogsViewProps) {
   const [selectedApp, setSelectedApp] = useState<AppSelection>("all");
   const [search, setSearch] = useState("");
@@ -117,13 +120,27 @@ export function LogsView({
         hiddenLogs: data.hiddenLogs,
         notes: data.notes,
       });
-      if (data.activeSession) {
+      if (!initialSessionId && data.activeSession) {
         setTestSession(data.activeSession);
       }
     }).catch(() => {
       setIssueStoreState(EMPTY_ISSUE_STORE);
     });
-  }, []);
+  }, [initialSessionId]);
+
+  useEffect(() => {
+    if (!initialSessionId) return;
+    fetchSessionsApi()
+      .then(({ sessions }) => {
+        const found = sessions.find((s) => s.id === initialSessionId);
+        if (found) {
+          setTestSession(found);
+          setLive(found.status === "active");
+          setNonce((n) => n + 1);
+        }
+      })
+      .catch(() => {});
+  }, [initialSessionId]);
 
   const sessionActive = testSession?.status === "active";
 

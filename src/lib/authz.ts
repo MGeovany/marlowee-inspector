@@ -77,3 +77,10 @@ export function clampRange(caps: Capabilities, requested: TimeRange): TimeRange 
   const order: TimeRange[] = ["1h", "24h", "7d"];
   return order.indexOf(requested) > order.indexOf(caps.maxRange) ? caps.maxRange : requested;
 }
+
+/** Roles that may read a given container app (highest rank first). */
+export function rolesForApp(app: string): Role[] {
+  return (Object.keys(CAPABILITIES) as Role[])
+    .filter((role) => CAPABILITIES[role].apps.includes(app))
+    .sort((a, b) => ROLE_RANK[b] - ROLE_RANK[a]);
+}

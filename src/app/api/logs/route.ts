@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/auth";
 import { capabilitiesFor, canReadApp, clampRange, highestRole } from "@/lib/authz";
-import { ALLOWED_APPS, buildLogsQuery, MAX_ROWS } from "@/lib/queries";
+import { ALLOWED_APPS, buildLogsQuery, buildSystemLogsQuery, MAX_ROWS } from "@/lib/queries";
 import { queryLogs } from "@/lib/log-analytics";
 import { parseQueryTimeWindow, SinceUntilParams } from "@/lib/api-params";
 import { effectiveQueryRange } from "@/lib/query-time";
@@ -29,7 +29,7 @@ const QuerySchema = z.object({
   range: z.enum(["1h", "24h", "7d"]).default("24h"),
   search: OptionalTextParam(256),
   level: z.enum(["ERROR", "WARN", "INFO", "LOG"]).optional(),
-  stream: z.enum(["stdout", "stderr", "all"]).default("all"),
+  stream: z.enum(["stdout", "stderr", "all", "system"]).default("all"),
   requestId: OptionalTextParam(128),
   errorsOnly: BoolParam,
   raw: BoolParam,
@@ -93,18 +93,29 @@ export async function GET(req: NextRequest) {
 
   // 6. Build + run a read-only allowlisted KQL query against Azure.
   try {
-    const kql = buildLogsQuery({
-      app,
-      range: queryRange,
-      search,
-      errorsOnly,
-      level: effectiveLevel,
-      stream,
-      requestId,
-      testSessionId,
-      limit,
-      timeWindow,
-    });
+    const kql =
+      stream === "system"
+        ? buildSystemLogsQuery({
+            app,
+            range: queryRange,
+            search,
+            errorsOnly,
+            level: effectiveLevel,
+            limit,
+            timeWindow,
+          })
+        : buildLogsQuery({
+            app,
+            range: queryRange,
+            search,
+            errorsOnly,
+            level: effectiveLevel,
+            stream,
+            requestId,
+            testSessionId,
+            limit,
+            timeWindow,
+          });
     const rows: LogEntry[] = await queryLogs(kql, queryRange);
 
     // Raw unmasked logs are not exposed yet; mask every frontend response server-side.

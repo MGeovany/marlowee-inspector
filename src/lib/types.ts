@@ -20,7 +20,7 @@ export interface LogEntry {
   message: string;
   revision: string; // e.g. ca-data-api--0007
   replica: string; // e.g. ca-data-api-7c9f6b8d4-abcde
-  stream: "stdout" | "stderr";
+  stream: "stdout" | "stderr" | "system";
   requestId?: string;
   /** Full raw log payload (structured JSON or plain text) shown in the detail sheet. */
   rawPayload: string;

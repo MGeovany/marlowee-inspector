@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { addNote, listNotesForIssue, listNotesForLog, listRecentNotes } from "@/lib/db/repository";
+import { addNote, listNotesForIssue, listNotesForLog, listRecentNotes, listAllNotes } from "@/lib/db/repository";
 
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -10,6 +10,7 @@ export async function GET(req: NextRequest) {
 
   const fingerprint = req.nextUrl.searchParams.get("fingerprint");
   const logId = req.nextUrl.searchParams.get("logId");
+  const all = req.nextUrl.searchParams.get("all");
 
   if (fingerprint) {
     const notes = await listNotesForIssue(fingerprint);
@@ -17,6 +18,10 @@ export async function GET(req: NextRequest) {
   }
   if (logId) {
     const notes = await listNotesForLog(logId);
+    return NextResponse.json(notes);
+  }
+  if (all === "true") {
+    const notes = await listAllNotes();
     return NextResponse.json(notes);
   }
 

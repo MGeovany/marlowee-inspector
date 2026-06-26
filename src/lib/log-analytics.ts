@@ -75,7 +75,9 @@ export async function queryLogs(kql: string, range: TimeRange): Promise<LogEntry
 
   return table.rows.map((row, i) => {
     const timestamp = timestampAt(row, cTime);
-    const stream = at(row, cStream).toLowerCase() === "stderr" ? "stderr" : "stdout";
+    const streamRaw = at(row, cStream).toLowerCase();
+    const stream: LogEntry["stream"] =
+      streamRaw === "stderr" ? "stderr" : streamRaw === "system" ? "system" : "stdout";
     const message = at(row, cMsg);
     const app = at(row, cApp) as ContainerApp;
     const entry: LogEntry = {

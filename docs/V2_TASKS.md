@@ -207,7 +207,7 @@ Hoy `LogsSidebar` renderiza 13 ítems estáticos; solo **Live Logs** tiene conte
   - **Contenido:** Header, TestSessionBar, SummaryCards, LogFilters, LogsTable, RecentSignalsPanel, LogDetailPanel.
   - **Pendiente:** Extraer a `live-logs-view.tsx`; routing vía 6.0.
 
-- [ ] **6.3** Vista **Test Sessions**
+- [x] **6.3** Vista **Test Sessions**
   - **Contenido:** CRUD sessions, historial, resume → Live Logs.
   - **APIs:** `/api/sessions`.
 
@@ -217,10 +217,10 @@ Hoy `LogsSidebar` renderiza 13 ítems estáticos; solo **Live Logs** tiene conte
 
 ### Triage
 
-- [ ] **6.5** Vista **Issues** — cola open/investigating; acciones resolve/suppress.
-- [ ] **6.6** Vista **Resolved** — issues cerrados; reopen.
-- [ ] **6.7** Vista **Hidden / Suppressed** — tabs hidden logs + suppressed fingerprints/reglas.
-- [ ] **6.8** Vista **Notes** — feed completo de `log_annotations`.
+- [x] **6.5** Vista **Issues** — cola open/investigating; acciones resolve/suppress.
+- [x] **6.6** Vista **Resolved** — issues cerrados; reopen.
+- [x] **6.7** Vista **Hidden / Suppressed** — tabs hidden logs + suppressed fingerprints/reglas.
+- [x] **6.8** Vista **Notes** — feed completo de `log_annotations`.
 
 ### Sources
 
@@ -239,12 +239,12 @@ Hoy `LogsSidebar` renderiza 13 ítems estáticos; solo **Live Logs** tiene conte
 |---|---------|-------|--------|
 | 6.1 | Overview | Dashboard KPIs | [ ] |
 | 6.2 | Live Logs | Stream + detail | [x] parcial |
-| 6.3 | Test Sessions | CRUD sessions | [ ] |
+| 6.3 | Test Sessions | CRUD sessions | [x] |
 | 6.4 | Search | Búsqueda + KQL | [ ] |
-| 6.5 | Issues | Cola triage | [ ] |
-| 6.6 | Resolved | Issues cerrados | [ ] |
-| 6.7 | Hidden / Suppressed | Tabs ocultos | [ ] |
-| 6.8 | Notes | Feed anotaciones | [ ] |
+| 6.5 | Issues | Cola triage | [x] |
+| 6.6 | Resolved | Issues cerrados | [x] |
+| 6.7 | Hidden / Suppressed | Tabs ocultos | [x] |
+| 6.8 | Notes | Feed anotaciones | [x] |
 | 6.9 | Container Apps | Catálogo apps | [ ] |
 | 6.10 | System Logs | System logs ACA | [ ] |
 | 6.11 | Access | Permisos | [ ] |
