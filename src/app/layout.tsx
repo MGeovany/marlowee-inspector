@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Rajdhani, Space_Mono } from "next/font/google";
 
+import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
 const rajdhani = Rajdhani({
@@ -32,7 +33,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${rajdhani.variable} ${rajdhaniHeading.variable} ${spaceMono.variable}`}>
-      <body className="min-h-dvh bg-bg font-sans">{children}</body>
+      <body className="min-h-dvh bg-bg font-sans">
+        {children}
+        <Toaster />
+      </body>
     </html>
   );
 }

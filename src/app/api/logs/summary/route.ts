@@ -144,9 +144,9 @@ function normalizeSummaryTable(
   let latestError: LogEntry | null = null;
   let latestWarning: LogEntry | null = null;
   let lastLogTimestamp: string | null = null;
-  const latestErrors: LogEntry[] = [];
+  let latestErrors: LogEntry[] = [];
   const errorPatterns: ErrorPatternSummary[] = [];
-  const recentActivity: LogEntry[] = [];
+  let recentActivity: LogEntry[] = [];
 
   for (const row of rows) {
     const kind = cell(row, columns.kind);
@@ -200,6 +200,10 @@ function normalizeSummaryTable(
   latestErrors.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
   recentActivity.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
   errorPatterns.sort((a, b) => b.count - a.count);
+
+  // Dedup: KQL union branches can return the same log row multiple times
+  latestErrors = dedupById(latestErrors);
+  recentActivity = dedupById(recentActivity);
 
   return {
     totalLogs,
@@ -291,6 +295,15 @@ function dateCell(row: unknown[], index: number): string | null {
 function numberCell(row: unknown[], index: number): number {
   const value = Number(cell(row, index));
   return Number.isFinite(value) ? value : 0;
+}
+
+function dedupById<T extends { id: string }>(arr: T[]): T[] {
+  const seen = new Set<string>();
+  return arr.filter((item) => {
+    if (seen.has(item.id)) return false;
+    seen.add(item.id);
+    return true;
+  });
 }
 
 function roundOneDecimal(value: number): number {

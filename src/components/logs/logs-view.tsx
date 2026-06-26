@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { useErrorNotifications } from "@/hooks/use-error-notifications";
 import {
   filterLogRows,
   relatedLogs,
@@ -229,10 +230,10 @@ export function LogsView({
   }, [fetchSummary, nonce]);
 
   useEffect(() => {
-    if (!live || !sessionActive) return;
+    if (!live) return;
     const id = window.setInterval(() => setNonce((n) => n + 1), LIVE_INTERVAL_MS);
     return () => window.clearInterval(id);
-  }, [live, sessionActive]);
+  }, [live]);
 
   const visibleRows = useMemo(
     () => allRows.filter((row) => !shouldSuppressEntry(issueStore, row)),
@@ -249,6 +250,39 @@ export function LogsView({
       }),
     [visibleRows, selectedApp, search, level, stream],
   );
+
+  const errorNotifyResetKey = useMemo(
+    () =>
+      [
+        timeRange,
+        selectedApp,
+        stream,
+        level,
+        search,
+        testSession?.id ?? "",
+        testSession?.startedAt ?? "",
+        requestIdFilter,
+        testSessionIdFilter,
+      ].join("|"),
+    [
+      timeRange,
+      selectedApp,
+      stream,
+      level,
+      search,
+      testSession?.id,
+      testSession?.startedAt,
+      requestIdFilter,
+      testSessionIdFilter,
+    ],
+  );
+
+  useErrorNotifications({
+    rows: allRows,
+    enabled: live && status === "success",
+    resetKey: errorNotifyResetKey,
+    onView: setDetailEntry,
+  });
 
   const sidePanel = useMemo(() => summaryToSidePanel(summary), [summary]);
   const resolvedIssues = useMemo(
