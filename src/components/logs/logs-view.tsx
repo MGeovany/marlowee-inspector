@@ -23,6 +23,27 @@ import {
   sessionTimeWindow,
   type TestSession,
 } from "@/lib/test-session";
+import {
+  EMPTY_ISSUE_STORE,
+  addIssueNote,
+  buildIssueFingerprint,
+  collectHiddenLogs,
+  collectManagedIssues,
+  hideLog,
+  isLogHidden,
+  issueStatusFor,
+  loadIssueStore,
+  notesForIssue,
+  notesForLog,
+  reopenLog,
+  saveIssueStore,
+  setIssueStatus,
+  shouldSuppressEntry,
+  type IssueStatus,
+  type IssueStore,
+  type NoteTarget,
+} from "@/lib/issues";
+import { AppIconRail } from "@/components/layout/app-icon-rail";
 import { LogDetailPanel } from "./log-detail-panel";
 import { LogFilters, type LogStream } from "./log-filters";
 import { LogsHeader } from "./logs-header";
@@ -36,7 +57,6 @@ interface LogsViewProps {
   allowedApps: ContainerApp[];
   role: string | null;
   userEmail: string | null;
-  canSeeRaw: boolean;
   maxRange: TimeRange;
   signOutAction: () => Promise<void>;
 }
@@ -57,7 +77,6 @@ export function LogsView({
   allowedApps,
   role,
   userEmail,
-  canSeeRaw,
   maxRange,
   signOutAction,
 }: LogsViewProps) {
@@ -67,7 +86,6 @@ export function LogsView({
   const [stream, setStream] = useState<LogStream>("all");
   const [timeRange, setTimeRange] = useState<TimeRange>(clampRange("24h", maxRange));
   const [errorsOnly, setErrorsOnly] = useState(false);
-  const [raw, setRaw] = useState(false);
   const [live, setLive] = useState(true);
 
   const [testSession, setTestSession] = useState<TestSession | null>(null);
@@ -83,11 +101,13 @@ export function LogsView({
   const [summary, setSummary] = useState<LogsSummaryResponse | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [nonce, setNonce] = useState(0);
+  const [issueStore, setIssueStoreState] = useState<IssueStore>(EMPTY_ISSUE_STORE);
 
   const [detailEntry, setDetailEntry] = useState<LogEntry | null>(null);
 
   useEffect(() => {
     setTestSession(loadTestSession());
+    setIssueStoreState(loadIssueStore());
   }, []);
 
   const sessionActive = testSession?.status === "active";
@@ -125,7 +145,6 @@ export function LogsView({
             app,
             range: timeRange,
             stream,
-            raw: String(raw),
             errorsOnly: String(errorsOnly),
             limit: "300",
           });
@@ -161,7 +180,6 @@ export function LogsView({
     allowedApps,
     timeRange,
     stream,
-    raw,
     errorsOnly,
     level,
     search,
@@ -186,29 +204,76 @@ export function LogsView({
     return () => window.clearInterval(id);
   }, [live, sessionActive]);
 
+  const visibleRows = useMemo(
+    () => allRows.filter((row) => !shouldSuppressEntry(issueStore, row)),
+    [allRows, issueStore],
+  );
+
   const tableRows = useMemo(
     () =>
-      filterLogRows(allRows, {
+      filterLogRows(visibleRows, {
         app: selectedApp,
         search,
         level,
         stream,
         errorsOnly,
       }),
-    [allRows, selectedApp, search, level, stream, errorsOnly],
+    [visibleRows, selectedApp, search, level, stream, errorsOnly],
   );
 
   const appStats = useMemo(
-    () => allowedApps.map((app) => computeAppStats(allRows, app)),
-    [allRows, allowedApps],
+    () => allowedApps.map((app) => computeAppStats(visibleRows, app)),
+    [visibleRows, allowedApps],
   );
 
-  const sidePanel = useMemo(() => computeSidePanel(allRows), [allRows]);
+  const sidePanel = useMemo(() => computeSidePanel(visibleRows), [visibleRows]);
+  const resolvedIssues = useMemo(
+    () => collectManagedIssues(allRows, issueStore, ["resolved"]),
+    [allRows, issueStore],
+  );
+  const suppressedIssues = useMemo(
+    () => collectManagedIssues(allRows, issueStore, ["suppressed", "hidden"]),
+    [allRows, issueStore],
+  );
+  const hiddenLogs = useMemo(
+    () => collectHiddenLogs(allRows, issueStore),
+    [allRows, issueStore],
+  );
+  const notesHistory = useMemo(
+    () => issueStore.notes.slice(0, 8),
+    [issueStore.notes],
+  );
 
   const related = useMemo(
-    () => (detailEntry ? relatedLogs(detailEntry, allRows) : []),
-    [detailEntry, allRows],
+    () => (detailEntry ? relatedLogs(detailEntry, visibleRows) : []),
+    [detailEntry, visibleRows],
   );
+  const detailFingerprint = detailEntry ? buildIssueFingerprint(detailEntry) : null;
+  const detailIssueStatus = detailFingerprint ? issueStatusFor(issueStore, detailFingerprint) : "open";
+  const detailIssueNotes = detailFingerprint ? notesForIssue(issueStore, detailFingerprint) : [];
+  const detailLogNotes = detailEntry ? notesForLog(issueStore, detailEntry.id) : [];
+  const detailLogHidden = detailEntry ? isLogHidden(issueStore, detailEntry) : false;
+
+  function updateIssueStore(next: IssueStore) {
+    setIssueStoreState(next);
+    saveIssueStore(next);
+  }
+
+  function handleIssueStatus(entry: LogEntry, status: IssueStatus) {
+    updateIssueStore(setIssueStatus(issueStore, entry, status));
+  }
+
+  function handleAddNote(entry: LogEntry, target: NoteTarget, text: string) {
+    updateIssueStore(addIssueNote(issueStore, entry, target, text));
+  }
+
+  function handleHideLog(entry: LogEntry) {
+    updateIssueStore(hideLog(issueStore, entry));
+  }
+
+  function handleReopenLog(logId: string) {
+    updateIssueStore(reopenLog(issueStore, logId));
+  }
 
   function handleSessionChange(session: TestSession | null) {
     setTestSession(session);
@@ -243,7 +308,8 @@ export function LogsView({
   }
 
   return (
-    <div className="flex h-dvh overflow-hidden bg-bg">
+    <div className="ambient-bg flex h-dvh overflow-hidden bg-bg">
+      <AppIconRail />
       <LogsSidebar
         allowedApps={allowedApps}
         selectedApp={selectedApp}
@@ -254,7 +320,7 @@ export function LogsView({
         signOutAction={signOutAction}
       />
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="relative z-[1] flex min-w-0 flex-1 flex-col">
         <LogsHeader
           lastRefresh={lastRefresh}
           live={live && sessionActive}
@@ -298,13 +364,10 @@ export function LogsView({
               maxRange={maxRange}
               errorsOnly={errorsOnly}
               onErrorsOnlyChange={setErrorsOnly}
-              raw={raw}
-              onRawChange={setRaw}
-              canSeeRaw={canSeeRaw}
               sessionMode={Boolean(testSession)}
             />
 
-            <div className="min-h-0 flex-1 bg-workspace workspace-grid">
+            <div className="glass-workspace min-h-0 flex-1">
               <LogsTable
                 status={status}
                 rows={tableRows}
@@ -324,6 +387,10 @@ export function LogsView({
 
           <RecentSignalsPanel
             data={sidePanel}
+            resolvedIssues={resolvedIssues}
+            suppressedIssues={suppressedIssues}
+            hiddenLogs={hiddenLogs}
+            notesHistory={notesHistory}
             onSelectLog={setDetailEntry}
             selectedId={detailEntry?.id ?? null}
           />
@@ -334,8 +401,17 @@ export function LogsView({
               related={related}
               timeRange={timeRange}
               masked={masked}
+              fingerprint={detailFingerprint ?? ""}
+              issueStatus={detailIssueStatus}
+              issueNotes={detailIssueNotes}
+              logNotes={detailLogNotes}
+              logHidden={detailLogHidden}
               onClose={() => setDetailEntry(null)}
               onSelectRelated={setDetailEntry}
+              onAddNote={handleAddNote}
+              onSetIssueStatus={handleIssueStatus}
+              onHideLog={handleHideLog}
+              onReopenLog={handleReopenLog}
             />
           )}
         </div>

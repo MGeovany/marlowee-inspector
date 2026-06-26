@@ -81,7 +81,7 @@ export function TestSessionBar({
 
   if (!session) {
     return (
-      <div className="shrink-0 border-b border-border bg-panel px-4 py-2.5">
+      <div className="shrink-0 border-b border-border glass-toolbar px-4 py-2.5">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-[10px] font-semibold uppercase tracking-[0.06em] text-fg-subtle">
             Test session
@@ -115,14 +115,15 @@ export function TestSessionBar({
       className={cn(
         "shrink-0 border-b px-4 py-2.5",
         session.status === "active"
-          ? "border-accent/30 bg-accent-soft"
-          : "border-border bg-panel",
+          ? "border-[rgba(65,196,100,0.25)] bg-[rgba(65,196,100,0.06)]"
+          : "border-border glass-toolbar",
       )}
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 space-y-1">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant={session.status === "active" ? "accent" : "neutral"}>
+            <Badge variant={session.status === "active" ? "success" : "neutral"}>
+              {session.status === "active" && <span className="live-dot mr-1" />}
               {session.status === "active" ? "Recording" : "Stopped"}
             </Badge>
             <span className="truncate font-medium text-fg">{session.name}</span>

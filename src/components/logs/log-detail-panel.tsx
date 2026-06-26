@@ -13,6 +13,7 @@ import {
   httpLine,
 } from "@/lib/log-details";
 import { kqlForLogEntry } from "@/lib/log-kql";
+import type { IssueNote, IssueStatus, NoteTarget } from "@/lib/issues";
 import type { LogEntry, TimeRange } from "@/lib/types";
 import { LevelBadge } from "./level-badge";
 
@@ -21,8 +22,17 @@ interface LogDetailPanelProps {
   related: LogEntry[];
   timeRange: TimeRange;
   masked: boolean;
+  fingerprint: string;
+  issueStatus: IssueStatus;
+  issueNotes: IssueNote[];
+  logNotes: IssueNote[];
+  logHidden: boolean;
   onClose: () => void;
   onSelectRelated: (entry: LogEntry) => void;
+  onAddNote: (entry: LogEntry, target: NoteTarget, text: string) => void;
+  onSetIssueStatus: (entry: LogEntry, status: IssueStatus) => void;
+  onHideLog: (entry: LogEntry) => void;
+  onReopenLog: (logId: string) => void;
 }
 
 type CopyTarget =
@@ -37,13 +47,24 @@ export function LogDetailPanel({
   related,
   timeRange,
   masked,
+  fingerprint,
+  issueStatus,
+  issueNotes,
+  logNotes,
+  logHidden,
   onClose,
   onSelectRelated,
+  onAddNote,
+  onSetIssueStatus,
+  onHideLog,
+  onReopenLog,
 }: LogDetailPanelProps) {
   const [copied, setCopied] = useState<CopyTarget | null>(null);
+  const [noteText, setNoteText] = useState("");
 
   useEffect(() => {
     setCopied(null);
+    setNoteText("");
   }, [entry?.id]);
 
   useEffect(() => {
@@ -65,24 +86,37 @@ export function LogDetailPanel({
     window.setTimeout(() => setCopied(null), 2000);
   }
 
+  function addNote(target: NoteTarget) {
+    if (!noteText.trim()) return;
+    onAddNote(entry, target, noteText);
+    setNoteText("");
+  }
+
+  const combinedNotes = [...logNotes, ...issueNotes]
+    .filter((note, i, arr) => arr.findIndex((n) => n.id === note.id) === i)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+
   return (
     <div className="absolute inset-0 z-30 flex">
       <div aria-hidden className="absolute inset-0 bg-black/45" onClick={onClose} />
       <aside
         role="dialog"
         aria-modal="true"
-        className="relative ml-auto flex h-full w-full max-w-[440px] flex-col border-l border-border bg-workspace shadow-[-8px_0_32px_rgba(0,0,0,0.35)]"
+        className="relative ml-auto flex h-full w-full max-w-[440px] flex-col border-l border-border glass-panel shadow-[-12px_0_40px_rgba(0,0,0,0.5)]"
       >
-        <header className="border-b border-border px-4 py-3">
+        <header className="border-b border-border bg-sidebar px-4 py-3">
           <div className="flex items-start justify-between gap-3">
             <div className="flex min-w-0 items-center gap-2">
               <LevelBadge level={entry.level} />
+              <Badge variant={issueStatus === "open" ? "neutral" : issueStatus === "resolved" ? "success" : "warn"}>
+                {logHidden ? "hidden log" : issueStatus}
+              </Badge>
               <span className="inline-flex items-center gap-1.5 font-mono text-micro text-fg-muted">
                 <span
                   className={cn(
                     "h-1.5 w-1.5 rounded-full",
                     entry.level === "ERROR"
-                      ? "bg-level-error shadow-[0_0_6px_rgba(239,83,80,0.45)]"
+                      ? "bg-level-error shadow-[0_0_6px_rgba(235,54,75,0.45)]"
                       : entry.level === "WARN"
                         ? "bg-level-warn"
                         : "bg-fg-subtle",
@@ -109,7 +143,7 @@ export function LogDetailPanel({
           <InfoTile
             label="HTTP"
             value={httpText ?? "—"}
-            valueClassName={httpText ? "text-[var(--orange)]" : undefined}
+            valueClassName={httpText ? "text-level-warn" : undefined}
           />
           <div className="rounded-md border border-border bg-sidebar px-2.5 py-2">
             <p className="section-label mb-1">Status · Latency</p>
@@ -176,9 +210,67 @@ export function LogDetailPanel({
             <Copy className="h-3 w-3" />
             {copied === "ai" ? "Copied" : "Copy for AI"}
           </Button>
+          <Button variant="outline" size="sm" onClick={() => onSetIssueStatus(entry, "investigating")}>
+            Investigating
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => onSetIssueStatus(entry, "resolved")}>
+            Mark as resolved
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => onSetIssueStatus(entry, "suppressed")}>
+            Suppress similar
+          </Button>
+          {logHidden ? (
+            <Button variant="outline" size="sm" onClick={() => onReopenLog(entry.id)}>
+              Reopen log
+            </Button>
+          ) : (
+            <Button variant="ghost" size="sm" onClick={() => onHideLog(entry)}>
+              Hide this log
+            </Button>
+          )}
+          {issueStatus !== "open" && (
+            <Button variant="ghost" size="sm" onClick={() => onSetIssueStatus(entry, "open")}>
+              Reopen
+            </Button>
+          )}
         </div>
 
         <div className="flex-1 space-y-4 overflow-y-auto p-4">
+          <section>
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <h3 className="section-label">Issue fingerprint</h3>
+              <Badge variant="neutral">{issueStatus}</Badge>
+            </div>
+            <p className="break-all rounded-md border border-border bg-sidebar px-3 py-2 font-mono text-[10px] leading-relaxed text-fg-subtle">
+              {fingerprint}
+            </p>
+          </section>
+
+          <section>
+            <h3 className="section-label mb-2">Notes</h3>
+            <textarea
+              value={noteText}
+              onChange={(event) => setNoteText(event.target.value)}
+              placeholder="Add context, owner, investigation notes, or remediation..."
+              className="min-h-[72px] w-full resize-none rounded-md border border-border bg-sidebar px-3 py-2 font-mono text-[11px] leading-relaxed text-fg outline-none focus:border-border-strong"
+            />
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              <Button variant="outline" size="sm" onClick={() => addNote("log")} disabled={!noteText.trim()}>
+                Add note to log
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => addNote("issue")} disabled={!noteText.trim()}>
+                Add note to error group
+              </Button>
+            </div>
+            <div className="mt-3 space-y-1.5">
+              {combinedNotes.length === 0 ? (
+                <p className="font-mono text-[10px] text-fg-subtle">No notes yet.</p>
+              ) : (
+                combinedNotes.map((note) => <NoteCard key={note.id} note={note} />)
+              )}
+            </div>
+          </section>
+
           {details.maskedFields.length > 0 && (
             <section>
               <div className="mb-2 flex items-center justify-between gap-2">
@@ -195,7 +287,7 @@ export function LogDetailPanel({
                     )}
                   >
                     <dt className="truncate font-mono text-[10px] text-fg-subtle">{field.key}</dt>
-                    <dd className="truncate font-mono text-[11px] text-[var(--yellow)]">
+                    <dd className="truncate font-mono text-[11px] text-level-warn">
                       {field.value}
                     </dd>
                   </div>
@@ -301,6 +393,20 @@ function InfoTile({
       >
         {value}
       </p>
+    </div>
+  );
+}
+
+function NoteCard({ note }: { note: IssueNote }) {
+  return (
+    <div className="rounded-md border border-border bg-sidebar px-3 py-2">
+      <div className="mb-1 flex items-center justify-between gap-2">
+        <Badge variant={note.target === "issue" ? "accent" : "neutral"}>{note.target}</Badge>
+        <span className="font-mono text-[10px] text-fg-subtle">
+          {new Date(note.createdAt).toLocaleString()}
+        </span>
+      </div>
+      <p className="whitespace-pre-wrap font-mono text-[11px] leading-relaxed text-fg">{note.text}</p>
     </div>
   );
 }

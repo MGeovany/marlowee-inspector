@@ -6,24 +6,26 @@ import brandIcon from "../icon.png";
 
 export default function LoginPage() {
   return (
-    <main className="flex min-h-dvh items-center justify-center bg-bg px-4 py-12">
-      <div className="w-full max-w-[380px]">
-        <div className="mb-6 flex items-center gap-2.5">
-          <Image
-            src={brandIcon}
-            alt=""
-            width={18}
-            height={18}
-            className="h-[18px] w-[18px] rounded-sm object-cover"
-            priority
-          />
-          <div>
-            <h1 className="font-heading text-[13px] tracking-tight text-fg">Marlowee Inspector</h1>
-            <p className="mt-0.5 text-[11px] text-fg-subtle">Internal log viewer · Savvly dev workspace</p>
+    <main className="ambient-bg relative flex min-h-dvh items-center justify-center bg-bg px-4 py-12">
+      <div className="relative z-[1] w-full max-w-[400px]">
+        <div className="mb-8 flex flex-col items-center text-center">
+          <div className="glass-card mb-4 flex h-14 w-14 items-center justify-center rounded-xl">
+            <Image
+              src={brandIcon}
+              alt=""
+              width={32}
+              height={32}
+              className="h-8 w-8 rounded-sm object-cover"
+              priority
+            />
           </div>
+          <h1 className="font-heading text-xl font-semibold text-fg">Marlowee Inspector</h1>
+          <p className="mt-1 text-[12px] text-fg-subtle">
+            Internal log viewer · Savvly dev workspace
+          </p>
         </div>
 
-        <div className="rounded-md border border-border bg-sidebar p-5">
+        <div className="glass-card rounded-xl p-6">
           <p className="section-label mb-4">
             {devBypass ? "Local dev · no Azure login" : "Employee access only"}
           </p>
@@ -37,7 +39,7 @@ export default function LoginPage() {
             {devBypass ? (
               <button
                 type="submit"
-                className="flex w-full items-center justify-center rounded-sm border border-border bg-panel px-3 py-2 text-micro font-medium text-fg transition-colors hover:border-border-strong hover:bg-panel-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-soft"
+                className="flex w-full items-center justify-center rounded-md border border-transparent bg-gradient-to-r from-accent-bright to-accent px-3 py-2.5 text-[13px] font-semibold text-black transition-colors hover:from-[#ffb033] hover:to-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(255,90,0,0.35)]"
               >
                 Continue as Dev ({process.env.AUTH_DEV_ROLE ?? "Admin"})
               </button>

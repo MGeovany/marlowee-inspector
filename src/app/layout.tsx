@@ -1,18 +1,26 @@
 import type { Metadata } from "next";
-import { Michroma, Urbanist } from "next/font/google";
+import { Rajdhani, Space_Mono } from "next/font/google";
 
 import "./globals.css";
 
-const michroma = Michroma({
+const rajdhani = Rajdhani({
   subsets: ["latin"],
-  weight: "400",
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-sans",
+  display: "swap",
+});
+
+const rajdhaniHeading = Rajdhani({
+  subsets: ["latin"],
+  weight: ["600", "700"],
   variable: "--font-heading",
   display: "swap",
 });
 
-const urbanist = Urbanist({
+const spaceMono = Space_Mono({
   subsets: ["latin"],
-  variable: "--font-sans",
+  weight: ["400", "700"],
+  variable: "--font-mono",
   display: "swap",
 });
 
@@ -23,8 +31,8 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${michroma.variable} ${urbanist.variable}`}>
-      <body className="min-h-dvh font-sans">{children}</body>
+    <html lang="en" className={`${rajdhani.variable} ${rajdhaniHeading.variable} ${spaceMono.variable}`}>
+      <body className="min-h-dvh bg-bg font-sans">{children}</body>
     </html>
   );
 }

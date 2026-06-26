@@ -9,10 +9,10 @@ export function MicrosoftSignInButton({ className }: MicrosoftSignInButtonProps)
     <button
       type="submit"
       className={cn(
-        "flex w-full items-center justify-center gap-2.5 rounded-sm border border-border bg-panel px-3 py-2",
-        "text-micro font-medium text-fg transition-colors",
+        "flex w-full items-center justify-center gap-2.5 rounded-md border border-border bg-glass px-3 py-2.5 backdrop-blur-sm",
+        "text-[13px] font-semibold text-fg transition-colors",
         "hover:border-border-strong hover:bg-panel-raised",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-soft",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(255,90,0,0.35)]",
         className,
       )}
     >

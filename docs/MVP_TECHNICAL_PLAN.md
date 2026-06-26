@@ -79,10 +79,52 @@ Browser (employee)
 3. Authorize: role allowed? requested app in the role's allowlist?
 4. Rate-limit check (per user).
 5. Build KQL from an **allowlisted** app name + enum time range + **escaped** free-text.
-6. Run query via `LogsQueryClient` (Managed Identity).
-7. Apply masking to every row server-side.
-8. Write an audit event (who, what app, what filters, row count, timestamp).
-9. Return masked rows to the client.
+6. Optional **test session window**: when active, append `TimeGenerated >= since` (and `<= until` when stopped). This filters the Marlowee view only — **Azure logs are never deleted**.
+7. Run query via `LogsQueryClient` (Managed Identity).
+8. Apply masking to every row server-side.
+9. Write an audit event (who, what app, what filters, row count, timestamp, test session id if any).
+10. Return masked rows to the client.
+
+---
+
+## 2. Test sessions (start from zero)
+
+Marlowee Inspector supports **test sessions** for focused QA/debug workflows. A test session is a
+**client-side view filter** backed by server-side KQL — it does **not** mutate or delete data in
+Log Analytics.
+
+**User intent:** “Start from zero” means clear the current table and only show logs emitted **after**
+the session start timestamp. Historical Azure data remains intact.
+
+**Session state (browser `sessionStorage`)**
+
+| Field | Description |
+|---|---|
+| `id` | Generated id, e.g. `ts_a1b2c3d4e5f6` — can be embedded in app logs as `testSessionId` |
+| `name` | Human label, e.g. `Testing contribution update` |
+| `startedAt` | ISO timestamp when the session began |
+| `stoppedAt` | ISO timestamp when the user stops recording (optional) |
+| `status` | `active` \| `stopped` |
+
+**UI controls**
+
+- **Start test session** — prompts for name, sets `startedAt = now()`, clears the table, enables live refresh.
+- **Stop session** — freezes the upper bound (`until = now()`), pauses live tail.
+- **Clear view** — empties the on-screen table; next refresh still queries `TimeGenerated >= startedAt`.
+- **End session** — exits session mode and returns to normal time-range browsing.
+- **Session bar** — shows name, duration (live clock while active), logs captured count, session id (copyable).
+- **Optional filters** — `requestId` and `testSessionId` (message contains) narrow results within the session window.
+
+**API**
+
+- `GET /api/logs?since=<iso>&until=<iso>&testSessionId=…`
+- `GET /api/logs/summary?since=<iso>&until=<iso>`
+- KQL helper: `| where TimeGenerated >= datetime("<since>")` (+ optional `<= until`)
+- SDK query duration is auto-expanded to cover the session span (up to role max range).
+
+**Audit**
+
+Search audit events may include `since`, `testSessionId` when a session window is applied.
 
 ---
 
@@ -199,28 +241,39 @@ Time range is an enum (`1h | 24h | 7d`) mapped to SDK `Durations`, never a raw u
 
 ```
 ┌───────────────────────────────────────────────────────────────┐
-│  MARLOWEE INSPECTOR                       ▢ marlon@savvly.com ▾ │   ← topbar (pixel wordmark)
+│  MARLOWEE INSPECTOR · law-savvly-dev-main      Live · Refresh │   ← header
 ├───────────────┬───────────────────────────────────────────────┤
-│  App          │  [ Search… ]  [ 1h | 24h | 7d ]  [ Errors only]│   ← filter bar
-│  ◉ ca-data-api│ ───────────────────────────────────────────────│
-│  ○ ca-dashboard│  10:42:01  ca-data-api  INFO  request handled │
-│  ○ ca-onboard.│  10:42:00  ca-data-api  ERROR timeout calling… │   ← virtualized log table
-│  ○ ca-admin   │  10:41:58  ca-data-api  WARN  retry 2/3        │
-│  (role-gated) │  …                                             │
-└───────────────┴───────────────────────────────────────────────┘
+│  App          │  [ Test session bar: name · duration · logs ] │   ← start/stop/clear
+│  ◉ ca-data-api│  [ Total | Errors | Warnings | Logs/min ]    │   ← summary cards (Azure)
+│  ○ ca-dashboard│  [ Search… ] [ Session window | 1h 24h 7d ]  │   ← filters
+│  ○ ca-onboard.│  TIMESTAMP  APP  LEVEL  MESSAGE  …           │   ← log table
+│  ○ ca-admin   │  …                          │ Latest incidents│   ← right signals panel
+│  (role-gated) │                             │ Detected errors │
+└───────────────┴─────────────────────────────┴ Recent activity─┘
 ```
+
+**Observability UI (implemented)**
+
+- Dark dev-tool aesthetic (`#1e1e1e` matte palette), Michroma headings + Urbanist body.
+- Left sidebar: app picker with error badges and health dots.
+- Summary cards: totals from `/api/logs/summary` (Azure aggregates).
+- Filter toolbar: search, level chips, stream, time range (or **Session window** when recording).
+- Right panel: stacked cards — Latest incidents, Detected errors, Recent activity.
+- Detail drawer: HTTP/status/latency tiles, masked fields, raw JSON, related logs.
+- **Test session bar** between header and summary cards (see §2).
 
 **Components (shadcn/ui):** `Sidebar`/nav, `Input` (search), `ToggleGroup` (time range),
 `Switch` (errors-only), `Badge` (log level, color-coded), `Table` + TanStack Virtual (log rows),
 `Sheet`/`Dialog` (row detail with full masked payload), `Sonner` (toasts), `Skeleton` (loading),
-`DropdownMenu` (user menu / sign-out).
+`DropdownMenu` (user menu / sign-out), **TestSessionBar** (session controls).
 
 **UX rules**
 
 - Monospace log lines, level color-coded (`ERROR` red, `WARN` amber, `INFO` muted).
 - App switcher only shows apps the user's role may read.
-- Empty state explains the 30-day retention limit.
+- Empty state explains the 30-day retention limit (or session-specific hint while recording).
 - A small "masked" indicator on rows so users know redaction is applied (except Admin raw mode).
+- Test sessions never delete Azure data; the UI states this explicitly when starting a session.
 
 ---
 

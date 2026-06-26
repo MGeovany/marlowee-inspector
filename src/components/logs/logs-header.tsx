@@ -1,7 +1,7 @@
 "use client";
 
 import { format } from "date-fns";
-import { Pause, Play, RefreshCw } from "lucide-react";
+import { ChevronRight, Pause, Play, RefreshCw } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -30,33 +30,34 @@ export function LogsHeader({
   testSession,
 }: LogsHeaderProps) {
   return (
-    <header className="shrink-0 border-b border-border bg-sidebar px-4 py-2.5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-          <MetaPill label="Environment" value="Development" accent />
-          <MetaPill label="Workspace" value="law-savvly-dev-main" mono />
-          <span className="font-mono text-[11px] tabular-nums text-fg-subtle">
-            Last refresh{" "}
-            {lastRefresh ? format(lastRefresh, "HH:mm:ss") : "—"}
-          </span>
+    <header className="glass-header shrink-0">
+      <div className="flex items-center justify-between gap-3 px-4 py-2">
+        <div className="min-w-0">
+          <div className="dd-breadcrumb flex items-center">
+            <span>Logs</span>
+            <ChevronRight className="dd-breadcrumb-sep h-3 w-3" />
+            <span className="text-fg-muted">Explorer</span>
+          </div>
+          <h1 className="dd-page-title mt-0.5">Log Explorer</h1>
         </div>
 
         <div className="flex items-center gap-2">
           {testSession && (
-            <Badge variant={testSession.status === "active" ? "accent" : "neutral"}>
+            <Badge variant={testSession.status === "active" ? "success" : "neutral"}>
+              {testSession.status === "active" && <span className="live-dot mr-1" />}
               Session · {testSession.status === "active" ? "live" : "stopped"}
             </Badge>
           )}
           {source === "mock" && <Badge variant="warn">mock</Badge>}
-          {masked && <Badge variant="neutral">masked</Badge>}
+          {masked && <Badge variant="neutral">MASKED</Badge>}
           <Button
-            variant={live ? "default" : "outline"}
+            variant={live ? "live" : "outline"}
             size="sm"
             onClick={onLiveToggle}
             title={live ? "Pause auto-refresh" : "Enable live tail"}
           >
             {live ? <Pause className="h-3 w-3" /> : <Play className="h-3 w-3" />}
-            {live ? "Live" : "Paused"}
+            {live ? "Live Tail" : "Paused"}
           </Button>
           <Button variant="outline" size="sm" onClick={onRefresh} disabled={loading}>
             <RefreshCw className={cn("h-3 w-3", loading && "animate-spin")} />
@@ -64,31 +65,28 @@ export function LogsHeader({
           </Button>
         </div>
       </div>
+
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border px-4 py-1.5">
+        <MetaItem label="Env" value="Development" />
+        <MetaItem label="Workspace" value="law-savvly-dev-main" mono />
+        <span className="font-mono text-[11px] tabular-nums text-fg-subtle">
+          Last refresh {lastRefresh ? format(lastRefresh, "HH:mm:ss") : "—"}
+        </span>
+      </div>
     </header>
   );
 }
 
-function MetaPill({
-  label,
-  value,
-  mono,
-  accent,
-}: {
-  label: string;
-  value: string;
-  mono?: boolean;
-  accent?: boolean;
-}) {
+function MetaItem({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
-    <div className="flex items-center gap-2">
-      <span className="text-[10px] font-semibold uppercase tracking-[0.06em] text-fg-subtle">
+    <div className="flex items-center gap-1.5">
+      <span className="text-[10px] font-semibold uppercase tracking-[0.05em] text-fg-subtle">
         {label}
       </span>
       <span
         className={cn(
-          "rounded-sm border border-border bg-bg px-2 py-0.5 text-[11px]",
+          "rounded-md bg-glass px-1.5 py-0.5 text-[11px] text-fg-muted backdrop-blur-sm",
           mono && "font-mono",
-          accent ? "text-[#b8b5ff]" : "text-fg",
         )}
       >
         {value}

@@ -14,7 +14,7 @@ interface Rule {
 const RULES: Rule[] = [
   {
     name: "authorization_header",
-    re: /\b(authorization)\b\s*[:=]\s*("[^"]*"|'[^']*'|[^\r\n,;}]+)/gi,
+    re: /\b(authorization)\b\s*[:=]\s*(Bearer\s+[A-Za-z0-9._~+/=-]{8,}|"[^"]*"|'[^']*'|[^\s,;}]+)/gi,
     replace: "$1: [REDACTED:authorization]",
   },
   {
@@ -85,7 +85,7 @@ export function maskLogEntry<T extends LogEntry>(row: T): T {
   };
 }
 
-export function maskRows<T extends MaskableRow>(rows: T[]): T[] {
+export function maskRows<T extends { message: string; rawPayload?: string }>(rows: T[]): T[] {
   return rows.map((row) => ({
     ...row,
     message: maskString(row.message),

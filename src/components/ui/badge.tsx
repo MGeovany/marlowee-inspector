@@ -4,16 +4,17 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const badgeVariants = cva(
-  "inline-flex items-center gap-1 rounded-sm border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.04em]",
+  "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.04em]",
   {
     variants: {
       variant: {
-        neutral: "border-border bg-[rgba(255,255,255,0.06)] text-fg-muted",
-        error: "border-[rgba(239,83,80,0.28)] bg-[rgba(239,83,80,0.12)] text-level-error",
-        warn: "border-[rgba(212,168,67,0.28)] bg-[rgba(212,168,67,0.12)] text-level-warn",
-        info: "border-[rgba(83,168,252,0.28)] bg-[rgba(83,168,252,0.12)] text-level-info",
-        debug: "border-border bg-[rgba(255,255,255,0.04)] text-level-debug",
-        accent: "border-transparent bg-accent-soft text-[#b8b5ff]",
+        neutral: "border-border bg-glass text-fg-muted backdrop-blur-sm",
+        error: "border-[rgba(242,77,77,0.35)] bg-[rgba(242,77,77,0.14)] text-level-error",
+        warn: "border-[rgba(255,157,0,0.35)] bg-[rgba(255,157,0,0.12)] text-accent-bright",
+        info: "border-[rgba(69,217,255,0.3)] bg-[rgba(69,217,255,0.1)] text-level-info",
+        debug: "border-border bg-[rgba(255,255,255,0.03)] text-level-debug",
+        accent: "border-[rgba(255,90,0,0.3)] bg-accent-soft text-accent-bright",
+        success: "border-[rgba(0,217,115,0.35)] bg-[rgba(0,217,115,0.12)] text-[var(--green)]",
       },
     },
     defaultVariants: {

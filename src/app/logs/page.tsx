@@ -22,7 +22,6 @@ export default async function LogsPage() {
       allowedApps={(caps?.apps ?? []) as ContainerApp[]}
       role={role}
       userEmail={session.user.email ?? null}
-      canSeeRaw={caps?.canSeeRaw ?? false}
       maxRange={(caps?.maxRange ?? "1h") as TimeRange}
       signOutAction={signOutAction}
     />

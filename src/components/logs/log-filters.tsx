@@ -27,9 +27,6 @@ interface LogFiltersProps {
   maxRange: TimeRange;
   errorsOnly: boolean;
   onErrorsOnlyChange: (v: boolean) => void;
-  raw: boolean;
-  onRawChange: (v: boolean) => void;
-  canSeeRaw: boolean;
   sessionMode?: boolean;
 }
 
@@ -53,9 +50,6 @@ export function LogFilters({
   maxRange,
   errorsOnly,
   onErrorsOnlyChange,
-  raw,
-  onRawChange,
-  canSeeRaw,
   sessionMode = false,
 }: LogFiltersProps) {
   const maxIdx = TIME_RANGES.indexOf(maxRange);
@@ -67,18 +61,18 @@ export function LogFilters({
 
   return (
     <div className="filter-toolbar">
-      <div className="relative min-w-[220px] flex-1">
-        <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-fg-subtle" />
+      <div className="query-bar min-w-[240px] flex-1">
+        <Search className="h-3.5 w-3.5 shrink-0 text-fg-subtle" />
         <Input
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
           placeholder="Search message, request id, revision…"
-          className="pl-8 font-mono"
+          className="h-7 border-0 bg-transparent px-1 font-mono shadow-none focus-visible:ring-0"
           aria-label="Search logs"
         />
       </div>
 
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-0.5">
         {LOG_LEVELS.map((l) => (
           <button
             key={l}
@@ -98,7 +92,9 @@ export function LogFilters({
 
       <div className="filter-segment">
         {sessionMode ? (
-          <span className="chip chip-active cursor-default font-mono text-[10px]">Session window</span>
+          <span className="chip chip-active cursor-default font-mono text-[10px]">
+            Session window
+          </span>
         ) : (
           TIME_RANGES.map((r, i) => {
             const disabled = i > maxIdx;
@@ -125,7 +121,7 @@ export function LogFilters({
 
       <div className="hidden h-5 w-px bg-border lg:block" />
 
-      <div className="hidden items-center gap-1 lg:flex">
+      <div className="hidden items-center gap-0.5 lg:flex">
         {(
           [
             { value: "all", label: "all" },
@@ -145,13 +141,6 @@ export function LogFilters({
       </div>
 
       <div className="ml-auto flex items-center gap-3">
-        {canSeeRaw && (
-          <label className="flex select-none items-center gap-2">
-            <Switch checked={raw} onCheckedChange={onRawChange} aria-label="Raw unmasked logs" />
-            <span className="text-[11px] text-fg-muted">Raw</span>
-          </label>
-        )}
-
         <label className="flex select-none items-center gap-2">
           <Switch
             checked={errorsOnly}
