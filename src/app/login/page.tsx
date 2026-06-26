@@ -1,6 +1,6 @@
 import Image from "next/image";
 
-import { signIn } from "@/auth";
+import { authProviderId, devBypass, signIn } from "@/auth";
 import { MicrosoftSignInButton } from "@/components/microsoft-sign-in-button";
 import brandIcon from "../icon.png";
 
@@ -29,16 +29,27 @@ export default function LoginPage() {
 
         <div className="rounded-2xl border border-surface-border bg-surface-elevated/80 p-6 shadow-glow backdrop-blur-sm">
           <p className="mb-5 text-center text-xs font-medium uppercase tracking-[0.18em] text-ink-faint">
-            Employee access only
+            {devBypass ? "Local dev · no Azure login" : "Employee access only"}
           </p>
 
           <form
             action={async () => {
               "use server";
-              await signIn("microsoft-entra-id", { redirectTo: "/" });
+              await signIn(authProviderId, { redirectTo: "/" });
             }}
           >
-            <MicrosoftSignInButton />
+            {devBypass ? (
+              <button
+                type="submit"
+                className="group flex w-full items-center justify-center gap-3 rounded-xl border border-surface-border bg-surface px-4 py-3 text-sm font-medium text-ink shadow-sm transition-all duration-200 hover:border-white/20 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-elevated active:scale-[0.99]"
+              >
+                <span>
+                  Continue as Dev ({process.env.AUTH_DEV_ROLE ?? "Admin"})
+                </span>
+              </button>
+            ) : (
+              <MicrosoftSignInButton />
+            )}
           </form>
         </div>
 
