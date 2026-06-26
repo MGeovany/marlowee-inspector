@@ -29,6 +29,11 @@ const DURATION: Record<TimeRange, string> = {
 
 const KNOWN_LEVELS: LogLevel[] = ["ERROR", "WARN", "INFO", "LOG", "DEBUG"];
 
+export interface LogAnalyticsTable {
+  columnNames: string[];
+  rows: unknown[][];
+}
+
 /** Normalise the case()-derived level string into the LogLevel union (defaults to LOG). */
 function normalizeLevel(value: string): LogLevel {
   const upper = value.toUpperCase();
@@ -40,21 +45,10 @@ function normalizeLevel(value: string): LogLevel {
  * { id, timestamp, app, level, stream, message, revision, replica, rawPayload }.
  */
 export async function queryLogs(kql: string, range: TimeRange): Promise<LogEntry[]> {
-  const workspaceId = process.env.AZURE_LOG_ANALYTICS_WORKSPACE_ID;
-  if (!workspaceId) throw new Error("AZURE_LOG_ANALYTICS_WORKSPACE_ID is not set");
-
-  const result = await client().queryWorkspace(workspaceId, kql, {
-    duration: DURATION[range],
-  });
-
-  if (result.status !== LogsQueryResultStatus.Success) {
-    throw new Error(`Log Analytics query failed: ${result.status}`);
-  }
-
-  const table = result.tables[0];
+  const table = await queryLogAnalyticsTable(kql, range);
   if (!table) return [];
 
-  const idx = (name: string) => table.columnDescriptors.findIndex((c) => c.name === name);
+  const idx = (name: string) => table.columnNames.findIndex((c) => c === name);
   const cTime = idx("TimeGenerated");
   const cApp = idx("App");
   const cLevel = idx("Level");
@@ -87,6 +81,30 @@ export async function queryLogs(kql: string, range: TimeRange): Promise<LogEntry
       rawPayload: at(row, cRaw) || message,
     } satisfies LogEntry;
   });
+}
+
+export async function queryLogAnalyticsTable(
+  kql: string,
+  range: TimeRange,
+): Promise<LogAnalyticsTable | null> {
+  const workspaceId = process.env.AZURE_LOG_ANALYTICS_WORKSPACE_ID;
+  if (!workspaceId) throw new Error("AZURE_LOG_ANALYTICS_WORKSPACE_ID is not set");
+
+  const result = await client().queryWorkspace(workspaceId, kql, {
+    duration: DURATION[range],
+  });
+
+  if (result.status !== LogsQueryResultStatus.Success) {
+    throw new Error(`Log Analytics query failed: ${result.status}`);
+  }
+
+  const table = result.tables[0];
+  if (!table) return null;
+
+  return {
+    columnNames: table.columnDescriptors.map((c) => c.name),
+    rows: table.rows,
+  };
 }
 
 function stringifyCell(value: unknown): string {

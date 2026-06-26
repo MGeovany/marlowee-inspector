@@ -28,7 +28,7 @@ const CARDS = [
   {
     key: "logsPerMin" as const,
     label: "Logs / min",
-    tone: "warn" as const,
+    tone: "orange" as const,
     accent: "border-l-[var(--orange)]",
     sparkKey: "logsPerMin" as const,
   },
@@ -107,7 +107,7 @@ function MetricCard({
   label: string;
   value: string;
   accent: string;
-  tone: "error" | "warn" | "info" | "success";
+  tone: "error" | "warn" | "orange" | "info" | "success";
   loading: boolean;
   sparkline: number[];
   badge: { text: string; className: string } | null;

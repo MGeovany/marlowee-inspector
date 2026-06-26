@@ -48,6 +48,11 @@ export interface BuildQueryInput {
   limit?: number;
 }
 
+export interface BuildSummaryQueryInput {
+  apps: string[];
+  range: TimeRange; // duration is applied by the SDK; kept here for clarity
+}
+
 const ERROR_TERMS = ["ERROR", "Error", "exception", "Exception", "FATAL", "panic", "stacktrace"];
 
 export function buildLogsQuery(input: BuildQueryInput): string {
@@ -103,4 +108,39 @@ export function buildLogsQuery(input: BuildQueryInput): string {
   lines.push(`| take ${limit}`);
 
   return lines.join("\n");
+}
+
+export function buildLogsSummaryQuery(input: BuildSummaryQueryInput): string {
+  const apps = input.apps.filter((app) => (ALLOWED_APPS as readonly string[]).includes(app));
+  if (apps.length === 0) throw new Error("No allowed apps for summary query");
+
+  const appList = apps.map((app) => `"${escapeKql(app)}"`).join(", ");
+  const errorTerms = ERROR_TERMS.map((term) => `"${term}"`).join(", ");
+  const nullMetrics =
+    'Count = long(null), TotalLogs = long(null), ErrorsCount = long(null), WarningsCount = long(null), LastLogTimestamp = datetime(null)';
+  const nullLogFields =
+    'App = "", Level = "", TimeGenerated = datetime(null), Message = "", Revision = "", Replica = "", Stream = ""';
+
+  return [
+    `let Base = materialize(${CONSOLE_TABLE}`,
+    '| extend App = tostring(column_ifexists("ContainerAppName_s", ""))',
+    '| extend Message = tostring(column_ifexists("Log_s", ""))',
+    '| extend Revision = tostring(column_ifexists("RevisionName_s", ""))',
+    '| extend Replica = tostring(column_ifexists("ContainerName_s", ""))',
+    '| extend Stream = tolower(tostring(column_ifexists("Stream_s", "stdout")))',
+    `| where App in (${appList})`,
+    "| extend Level = case(" +
+      `Message has_any (${errorTerms}), "ERROR", ` +
+      'Message has_any ("WARN","WARNING"), "WARN", ' +
+      'Message has "INFO", "INFO", ' +
+      '"LOG")',
+    ");",
+    "union",
+    `  (Base | summarize TotalLogs = count(), ErrorsCount = countif(Level == "ERROR"), WarningsCount = countif(Level == "WARN"), LastLogTimestamp = max(TimeGenerated) | project Kind = "totals", Key = "", ${nullMetrics.replace("TotalLogs = long(null), ErrorsCount = long(null), WarningsCount = long(null), LastLogTimestamp = datetime(null)", "TotalLogs, ErrorsCount, WarningsCount, LastLogTimestamp")}, ${nullLogFields}),`,
+    `  (Base | summarize Count = countif(Level == "ERROR") by App | project Kind = "errorsByApp", Key = App, Count, TotalLogs = long(null), ErrorsCount = long(null), WarningsCount = long(null), LastLogTimestamp = datetime(null), App = "", Level = "", TimeGenerated = datetime(null), Message = "", Revision = "", Replica = "", Stream = ""),`,
+    `  (Base | summarize Count = count() by Level | project Kind = "logsByLevel", Key = Level, Count, TotalLogs = long(null), ErrorsCount = long(null), WarningsCount = long(null), LastLogTimestamp = datetime(null), ${nullLogFields}),`,
+    `  (Base | summarize Count = count() by App | top 1 by Count desc | project Kind = "mostNoisyApp", Key = App, Count, TotalLogs = long(null), ErrorsCount = long(null), WarningsCount = long(null), LastLogTimestamp = datetime(null), App = "", Level = "", TimeGenerated = datetime(null), Message = "", Revision = "", Replica = "", Stream = ""),`,
+    `  (Base | where Level == "ERROR" | top 1 by TimeGenerated desc | project Kind = "latestError", Key = "", ${nullMetrics}, App, Level, TimeGenerated, Message, Revision, Replica, Stream),`,
+    `  (Base | where Level == "WARN" | top 1 by TimeGenerated desc | project Kind = "latestWarning", Key = "", ${nullMetrics}, App, Level, TimeGenerated, Message, Revision, Replica, Stream)`,
+  ].join("\n");
 }

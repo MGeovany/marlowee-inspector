@@ -38,7 +38,83 @@ function pick<T>(arr: T[], rng: () => number): T {
   return arr[Math.floor(rng() * arr.length)];
 }
 function reqId(rng: () => number): string {
-  return `${pick(ids, rng)}-${pick(ids, rng)}-${pick(ids, rng)}`;
+  return `req_${pick(ids, rng)}${pick(ids, rng)}${pick(ids, rng)}`.toUpperCase();
+}
+
+function parseHttpFromMessage(message: string): {
+  method?: string;
+  path?: string;
+  status?: number;
+  latencyMs?: number;
+} | null {
+  const verb = message.match(/\b(GET|POST|PUT|PATCH|DELETE)\b/i)?.[1]?.toUpperCase();
+  const path = message.match(/\/[\w\-./{}:?&=%]+/)?.[0];
+  const status = message.match(/\b([2345]\d{2})\b/)?.[1];
+  const latencyMs = message.match(/(\d+)\s*ms\b/i)?.[1];
+  if (!verb && !path && !status) return null;
+  return {
+    method: verb,
+    path,
+    status: status ? Number(status) : undefined,
+    latencyMs: latencyMs ? Number(latencyMs) : undefined,
+  };
+}
+
+function buildRawPayload(
+  entry: Omit<LogEntry, "rawPayload">,
+  rng: () => number,
+): string {
+  const http = parseHttpFromMessage(entry.message);
+  const hasRequest = Boolean(entry.requestId);
+  const payload: Record<string, unknown> = {
+    timestamp: entry.timestamp,
+    level: entry.level,
+    container_app: entry.app,
+    revision: entry.revision,
+    replica: entry.replica,
+    stream: entry.stream,
+    message: entry.message,
+  };
+
+  if (entry.requestId) payload.request_id = entry.requestId;
+
+  if (http) {
+    payload.http = {
+      method: http.method ?? "GET",
+      path: http.path ?? "/",
+      status: http.status ?? (entry.level === "ERROR" ? 500 : 200),
+      latency_ms: http.latencyMs ?? Math.floor(rng() * 400 + 20),
+    };
+  } else if (entry.level === "ERROR") {
+    payload.http = {
+      method: "POST",
+      path: "/v1/transactions",
+      status: 500,
+      latency_ms: Math.floor(rng() * 20000 + 10000),
+    };
+  }
+
+  if (hasRequest || entry.level === "ERROR" || entry.level === "WARN") {
+    payload.context = {
+      user_id: `usr_${pick(ids, rng)}${pick(ids, rng)}`,
+      email: `${pick(["j", "m", "a", "s"], rng)}******@savvly.com`,
+      ip: `10.0.${Math.floor(rng() * 200 + 1)}.${Math.floor(rng() * 200 + 1)}`,
+      region: pick(["westeurope", "eastus", "northeurope"], rng),
+      tenant: "savvly-prod",
+    };
+    payload.request = {
+      authorization: `Bearer sk_test_mock_[REDACTED]`,
+    };
+  }
+
+  if (entry.level === "ERROR" || rng() > 0.7) {
+    payload.trace = {
+      trace_id: `${pick(ids, rng)}${pick(ids, rng)}${pick(ids, rng)}${pick(ids, rng)}`,
+      span_id: `${pick(ids, rng)}${pick(ids, rng)}`,
+    };
+  }
+
+  return JSON.stringify(payload, null, 2);
 }
 
 const TEMPLATES: Record<ContainerApp, Template[]> = {
@@ -48,7 +124,7 @@ const TEMPLATES: Record<ContainerApp, Template[]> = {
     { level: "INFO", weight: 4, msg: (r) => `db query took ${Math.floor(r() * 120 + 3)}ms (pool=${Math.floor(r() * 10 + 1)})` },
     { level: "WARN", weight: 3, msg: (r) => `slow query ${Math.floor(r() * 1500 + 800)}ms on table projections` },
     { level: "WARN", weight: 2, msg: () => `retry 2/3 calling pricing-service (timeout)` },
-    { level: "ERROR", weight: 2, stream: "stderr", msg: (r) => `Unhandled rejection: ECONNREFUSED to redis:6379 (req ${reqId(r)})` },
+    { level: "ERROR", weight: 2, stream: "stderr", msg: () => `Unhandled SqlException: timeout expired after 30s on POST /v1/transactions` },
     { level: "ERROR", weight: 1, stream: "stderr", msg: () => `ValidationError: field "amount" must be a positive number` },
     { level: "INFO", weight: 2, msg: () => `authenticated user ops@savvly.com via service token` },
     { level: "DEBUG", weight: 2, msg: (r) => `cache miss key=acct:${pick(ids, r)} ttl=300` },
@@ -111,8 +187,9 @@ function buildDataset(): LogEntry[] {
       const age = Math.pow(rng(), 2) * sevenDays;
       const ts = new Date(now - age).toISOString();
       const message = tpl.msg(rng);
+      const requestId = tpl.level === "ERROR" || rng() > 0.6 ? reqId(rng) : undefined;
 
-      out.push({
+      const row: Omit<LogEntry, "rawPayload"> = {
         id: `${app}-${i.toString(36)}-${pick(ids, rng)}`,
         timestamp: ts,
         app,
@@ -121,19 +198,12 @@ function buildDataset(): LogEntry[] {
         revision: rev,
         replica: `${replicaBase}-${pick(ids, rng)}`,
         stream: tpl.stream ?? "stdout",
-        requestId: tpl.level === "ERROR" || rng() > 0.6 ? reqId(rng) : undefined,
-        rawPayload: JSON.stringify(
-          {
-            time: ts,
-            app,
-            revision: rev,
-            level: tpl.level,
-            stream: tpl.stream ?? "stdout",
-            message,
-          },
-          null,
-          2,
-        ),
+        requestId,
+      };
+
+      out.push({
+        ...row,
+        rawPayload: buildRawPayload(row, rng),
       });
     }
   }

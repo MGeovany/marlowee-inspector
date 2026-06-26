@@ -44,6 +44,23 @@ export interface LogsResponse {
   source: "mock" | "azure";
 }
 
+export interface LogsSummaryResponse {
+  totalLogs: number;
+  errorsCount: number;
+  warningsCount: number;
+  logsPerMinute: number;
+  mostNoisyApp: ContainerApp | null;
+  mostNoisyAppCount: number;
+  latestError: LogEntry | null;
+  latestWarning: LogEntry | null;
+  errorsByApp: Partial<Record<ContainerApp, number>>;
+  logsByLevel: Partial<Record<LogLevel, number>>;
+  lastLogTimestamp: string | null;
+  apps: ContainerApp[];
+  timeRange: TimeRange;
+  source: "azure";
+}
+
 // Levels offered in the filter dropdown — the set Azure detection produces.
 export const LOG_LEVELS: LogLevel[] = ["ERROR", "WARN", "INFO", "LOG"];
 export const TIME_RANGES: TimeRange[] = ["1h", "24h", "7d"];
