@@ -72,13 +72,13 @@ export function LogFilters({
 
   return (
     <div className="filter-toolbar">
-      <div className="query-bar min-w-[240px] flex-1">
-        <Search className="h-3.5 w-3.5 shrink-0 text-fg-subtle" />
+      <div className="query-bar min-w-[320px] flex-[1.8]">
+        <Search className="h-4 w-4 shrink-0 text-accent-bright" />
         <Input
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
-          placeholder="Search message, request id, revision…"
-          className="h-7 border-0 bg-transparent px-1 font-mono shadow-none focus-visible:ring-0"
+          placeholder="Search logs, requestId, endpoint, error message…"
+          className="h-8 border-0 bg-transparent px-1 font-mono text-[12px] shadow-none placeholder:text-fg-subtle focus-visible:ring-0"
           aria-label="Search logs"
         />
       </div>

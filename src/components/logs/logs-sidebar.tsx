@@ -103,7 +103,7 @@ export function LogsSidebar({ userEmail, role, signOutAction }: LogsSidebarProps
       <div className="border-t border-border p-3">
         <div className="flex items-center gap-2.5 rounded-lg px-1 py-1">
           <div
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-accent-bright to-accent text-[11px] font-bold text-black"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-accent-bright to-accent text-[11px] font-bold text-white"
             aria-hidden
           >
             {initials}

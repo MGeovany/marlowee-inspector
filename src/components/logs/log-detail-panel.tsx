@@ -256,7 +256,7 @@ export function LogDetailPanel({
               value={noteText}
               onChange={(event) => setNoteText(event.target.value)}
               placeholder="Add context, owner, investigation notes, or remediation..."
-              className="min-h-[72px] w-full resize-none rounded-md detail-drawer-inner px-3 py-2 font-mono text-[11px] leading-relaxed text-fg outline-none focus:border-[rgba(255,90,0,0.35)]"
+              className="min-h-[72px] w-full resize-none rounded-md detail-drawer-inner px-3 py-2 font-mono text-[11px] leading-relaxed text-fg outline-none focus:border-[rgba(224,44,33,0.35)]"
             />
             <div className="mt-2 flex flex-wrap gap-1.5">
               <Button variant="outline" size="sm" onClick={() => addNote("log")} disabled={!noteText.trim()}>

@@ -38,7 +38,7 @@ export function Select({
         onChange={(e) => onValueChange(e.target.value)}
         className={cn(
           "h-8 w-full appearance-none rounded-md border border-border bg-glass px-2.5 py-1 pr-7 font-mono text-[11px] text-fg backdrop-blur-sm",
-          "focus-visible:border-[rgba(255,90,0,0.45)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[rgba(255,90,0,0.25)]",
+          "focus-visible:border-[rgba(224,44,33,0.45)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-ring-soft)]",
           "disabled:cursor-not-allowed disabled:opacity-35",
         )}
         {...rest}

@@ -23,7 +23,7 @@ export function Switch({ checked, onCheckedChange, id, disabled, className }: Sw
       onClick={() => onCheckedChange(!checked)}
       className={cn(
         "relative inline-flex h-[18px] w-[30px] shrink-0 items-center rounded-full border transition-colors",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(255,90,0,0.35)] focus-visible:ring-offset-1 focus-visible:ring-offset-bg",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-ring)] focus-visible:ring-offset-1 focus-visible:ring-offset-bg",
         "disabled:cursor-not-allowed disabled:opacity-35",
         checked
           ? "border-accent bg-gradient-to-r from-accent-bright to-accent"

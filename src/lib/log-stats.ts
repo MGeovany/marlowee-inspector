@@ -1,4 +1,5 @@
 import { TIME_RANGE_MS, type ContainerApp, type LogEntry, type LogMetricsResponse, type TimeRange } from "./types";
+import { extractLogDetails } from "./log-details";
 
 export type AppHealth = "healthy" | "warning" | "error";
 
@@ -271,18 +272,63 @@ export function filterLogRows(
     stream: "stdout" | "stderr" | "all";
   },
 ): LogEntry[] {
-  const search = opts.search.trim().toLowerCase();
+  const query = parseSearchQuery(opts.search);
 
   return rows.filter((row) => {
     if (opts.app !== "all" && row.app !== opts.app) return false;
     if (opts.level !== "ALL" && row.level !== opts.level) return false;
     if (opts.stream !== "all" && row.stream !== opts.stream) return false;
-    if (search) {
-      const haystack = [row.message, row.revision, row.replica, row.requestId ?? ""]
-        .join(" ")
-        .toLowerCase();
-      if (!haystack.includes(search)) return false;
-    }
+    if (query.app && row.app !== query.app) return false;
+    if (query.level && row.level.toLowerCase() !== query.level) return false;
+    if (query.terms.length > 0 && !matchesSearchTerms(row, query.terms)) return false;
     return true;
   });
+}
+
+function parseSearchQuery(input: string): { app?: string; level?: string; terms: string[] } {
+  const tokens = input.trim().toLowerCase().match(/"[^"]+"|\S+/g) ?? [];
+  const terms: string[] = [];
+  let app: string | undefined;
+  let level: string | undefined;
+
+  for (const token of tokens) {
+    const clean = token.replace(/^"|"$/g, "");
+    if (clean.startsWith("app:")) {
+      app = clean.slice(4);
+      continue;
+    }
+    if (clean.startsWith("level:")) {
+      level = clean.slice(6).toUpperCase() === "WARN" ? "warn" : clean.slice(6).toLowerCase();
+      continue;
+    }
+    terms.push(clean);
+  }
+
+  return { app, level, terms };
+}
+
+function matchesSearchTerms(row: LogEntry, terms: string[]): boolean {
+  const details = extractLogDetails(row, true);
+  const contextValues = Object.entries(details.context).flatMap(([key, value]) => [key, value]);
+  const statusCode = details.http.status != null ? String(details.http.status) : "";
+  const endpoint = details.http.path ?? "";
+  const userContext = contextValues.filter((value) => /user|userid|user_id|subject|sub/i.test(value));
+  const haystack = [
+    row.message,
+    row.rawPayload,
+    row.requestId ?? "",
+    row.app,
+    row.level,
+    row.revision,
+    row.replica,
+    row.stream,
+    endpoint,
+    statusCode,
+    ...contextValues,
+    ...userContext,
+  ]
+    .join(" ")
+    .toLowerCase();
+
+  return terms.every((term) => haystack.includes(term));
 }
