@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
-  computeAppStats,
   computeSidePanel,
   filterLogRows,
   relatedLogs,
@@ -84,7 +83,6 @@ export function LogsView({
   const [level, setLevel] = useState<LogLevel | "ALL">("ALL");
   const [stream, setStream] = useState<LogStream>("all");
   const [timeRange, setTimeRange] = useState<TimeRange>(clampRange("24h", maxRange));
-  const [errorsOnly, setErrorsOnly] = useState(false);
   const [live, setLive] = useState(true);
 
   const [testSession, setTestSession] = useState<TestSession | null>(null);
@@ -144,7 +142,7 @@ export function LogsView({
             app,
             range: timeRange,
             stream,
-            errorsOnly: String(errorsOnly),
+            errorsOnly: "false",
             limit: "300",
           });
           if (search.trim()) params.set("search", search.trim());
@@ -179,7 +177,6 @@ export function LogsView({
     allowedApps,
     timeRange,
     stream,
-    errorsOnly,
     level,
     search,
     testSession,
@@ -215,14 +212,8 @@ export function LogsView({
         search,
         level,
         stream,
-        errorsOnly,
       }),
-    [visibleRows, selectedApp, search, level, stream, errorsOnly],
-  );
-
-  const appStats = useMemo(
-    () => allowedApps.map((app) => computeAppStats(visibleRows, app)),
-    [visibleRows, allowedApps],
+    [visibleRows, selectedApp, search, level, stream],
   );
 
   const sidePanel = useMemo(() => computeSidePanel(visibleRows), [visibleRows]);
@@ -309,10 +300,6 @@ export function LogsView({
   return (
     <div className="ambient-bg flex h-dvh overflow-hidden bg-bg">
       <LogsSidebar
-        allowedApps={allowedApps}
-        selectedApp={selectedApp}
-        onSelectApp={setSelectedApp}
-        appStats={appStats}
         userEmail={userEmail}
         role={role}
         signOutAction={signOutAction}
@@ -353,6 +340,9 @@ export function LogsView({
             <LogFilters
               search={search}
               onSearchChange={setSearch}
+              allowedApps={allowedApps}
+              selectedApp={selectedApp}
+              onAppChange={setSelectedApp}
               level={level}
               onLevelChange={setLevel}
               stream={stream}
@@ -360,8 +350,6 @@ export function LogsView({
               timeRange={timeRange}
               onTimeRangeChange={setTimeRange}
               maxRange={maxRange}
-              errorsOnly={errorsOnly}
-              onErrorsOnlyChange={setErrorsOnly}
               sessionMode={Boolean(testSession)}
             />
 

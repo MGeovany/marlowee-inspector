@@ -3,21 +3,26 @@
 import { Search } from "lucide-react";
 
 import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
+import { Select } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import {
+  type ContainerApp,
   type LogLevel,
   type TimeRange,
   LOG_LEVELS,
   TIME_RANGES,
   TIME_RANGE_LABEL,
 } from "@/lib/types";
+import type { AppSelection } from "./logs-sidebar";
 
 export type LogStream = "stdout" | "stderr" | "all";
 
 interface LogFiltersProps {
   search: string;
   onSearchChange: (v: string) => void;
+  allowedApps: ContainerApp[];
+  selectedApp: AppSelection;
+  onAppChange: (app: AppSelection) => void;
   level: LogLevel | "ALL";
   onLevelChange: (v: LogLevel | "ALL") => void;
   stream: LogStream;
@@ -25,8 +30,6 @@ interface LogFiltersProps {
   timeRange: TimeRange;
   onTimeRangeChange: (v: TimeRange) => void;
   maxRange: TimeRange;
-  errorsOnly: boolean;
-  onErrorsOnlyChange: (v: boolean) => void;
   sessionMode?: boolean;
 }
 
@@ -41,6 +44,9 @@ const LEVEL_CHIP: Record<LogLevel, string> = {
 export function LogFilters({
   search,
   onSearchChange,
+  allowedApps,
+  selectedApp,
+  onAppChange,
   level,
   onLevelChange,
   stream,
@@ -48,16 +54,21 @@ export function LogFilters({
   timeRange,
   onTimeRangeChange,
   maxRange,
-  errorsOnly,
-  onErrorsOnlyChange,
   sessionMode = false,
 }: LogFiltersProps) {
   const maxIdx = TIME_RANGES.indexOf(maxRange);
 
   function toggleLevel(l: LogLevel) {
-    if (errorsOnly) return;
     onLevelChange(level === l ? "ALL" : l);
   }
+
+  const appOptions = [
+    { value: "all", label: "All apps" },
+    ...allowedApps.map((app) => ({
+      value: app,
+      label: shortAppName(app),
+    })),
+  ];
 
   return (
     <div className="filter-toolbar">
@@ -72,18 +83,21 @@ export function LogFilters({
         />
       </div>
 
+      <Select
+        value={selectedApp}
+        onValueChange={(v) => onAppChange(v as AppSelection)}
+        options={appOptions}
+        aria-label="Filter by service"
+        className="w-[148px] shrink-0"
+      />
+
       <div className="flex items-center gap-0.5">
         {LOG_LEVELS.map((l) => (
           <button
             key={l}
             type="button"
-            disabled={errorsOnly}
             onClick={() => toggleLevel(l)}
-            className={cn(
-              LEVEL_CHIP[l],
-              level === l && !errorsOnly && "chip-active",
-              errorsOnly && "cursor-not-allowed opacity-35",
-            )}
+            className={cn(LEVEL_CHIP[l], level === l && "chip-active")}
           >
             {l}
           </button>
@@ -139,17 +153,10 @@ export function LogFilters({
           </button>
         ))}
       </div>
-
-      <div className="ml-auto flex items-center gap-3">
-        <label className="flex select-none items-center gap-2">
-          <Switch
-            checked={errorsOnly}
-            onCheckedChange={onErrorsOnlyChange}
-            aria-label="Errors only"
-          />
-          <span className="text-[11px] text-fg-muted">Errors only</span>
-        </label>
-      </div>
     </div>
   );
+}
+
+function shortAppName(app: ContainerApp): string {
+  return app.startsWith("ca-") ? app.slice(3) : app;
 }

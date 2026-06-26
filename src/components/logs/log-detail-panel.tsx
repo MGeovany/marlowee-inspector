@@ -97,14 +97,18 @@ export function LogDetailPanel({
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 
   return (
-    <div className="absolute inset-0 z-30 flex">
-      <div aria-hidden className="absolute inset-0 bg-black/45" onClick={onClose} />
+    <div className="fixed inset-0 z-50 flex">
+      <div
+        aria-hidden
+        className="detail-drawer-backdrop absolute inset-0"
+        onClick={onClose}
+      />
       <aside
         role="dialog"
         aria-modal="true"
-        className="relative ml-auto flex h-full w-full max-w-[440px] flex-col border-l border-border glass-panel shadow-[-12px_0_40px_rgba(0,0,0,0.5)]"
+        className="detail-drawer relative ml-auto flex w-full max-w-[480px] flex-col"
       >
-        <header className="border-b border-border bg-sidebar px-4 py-3">
+        <header className="shrink-0 border-b border-border px-4 py-3">
           <div className="flex items-start justify-between gap-3">
             <div className="flex min-w-0 items-center gap-2">
               <LevelBadge level={entry.level} />
@@ -145,7 +149,7 @@ export function LogDetailPanel({
             value={httpText ?? "—"}
             valueClassName={httpText ? "text-level-warn" : undefined}
           />
-          <div className="rounded-md border border-border bg-sidebar px-2.5 py-2">
+          <div className="detail-drawer-inner rounded-md px-2.5 py-2">
             <p className="section-label mb-1">Status · Latency</p>
             {details.http.status != null || details.http.latencyMs != null ? (
               <p className="font-mono text-[11px] tabular-nums">
@@ -235,13 +239,13 @@ export function LogDetailPanel({
           )}
         </div>
 
-        <div className="flex-1 space-y-4 overflow-y-auto p-4">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
           <section>
             <div className="mb-2 flex items-center justify-between gap-2">
               <h3 className="section-label">Issue fingerprint</h3>
               <Badge variant="neutral">{issueStatus}</Badge>
             </div>
-            <p className="break-all rounded-md border border-border bg-sidebar px-3 py-2 font-mono text-[10px] leading-relaxed text-fg-subtle">
+            <p className="break-all detail-drawer-inner rounded-md px-3 py-2 font-mono text-[10px] leading-relaxed text-fg-subtle">
               {fingerprint}
             </p>
           </section>
@@ -252,7 +256,7 @@ export function LogDetailPanel({
               value={noteText}
               onChange={(event) => setNoteText(event.target.value)}
               placeholder="Add context, owner, investigation notes, or remediation..."
-              className="min-h-[72px] w-full resize-none rounded-md border border-border bg-sidebar px-3 py-2 font-mono text-[11px] leading-relaxed text-fg outline-none focus:border-border-strong"
+              className="min-h-[72px] w-full resize-none rounded-md detail-drawer-inner px-3 py-2 font-mono text-[11px] leading-relaxed text-fg outline-none focus:border-[rgba(255,90,0,0.35)]"
             />
             <div className="mt-2 flex flex-wrap gap-1.5">
               <Button variant="outline" size="sm" onClick={() => addNote("log")} disabled={!noteText.trim()}>
@@ -277,7 +281,7 @@ export function LogDetailPanel({
                 <h3 className="section-label">Masked fields</h3>
                 {masked && <Badge variant="warn">PII redacted</Badge>}
               </div>
-              <dl className="overflow-hidden rounded-md border border-border bg-sidebar">
+              <dl className="detail-drawer-inner overflow-hidden rounded-md">
                 {details.maskedFields.map((field, i) => (
                   <div
                     key={field.key}
@@ -299,7 +303,7 @@ export function LogDetailPanel({
           {Object.keys(details.context).length > 0 && (
             <section>
               <h3 className="section-label mb-2">Context</h3>
-              <dl className="overflow-hidden rounded-md border border-border bg-sidebar">
+              <dl className="detail-drawer-inner overflow-hidden rounded-md">
                 {Object.entries(details.context)
                   .filter(([key]) => !details.maskedFields.some((f) => f.key === key))
                   .slice(0, 8)
@@ -382,7 +386,7 @@ function InfoTile({
   mono?: boolean;
 }) {
   return (
-    <div className="rounded-md border border-border bg-sidebar px-2.5 py-2">
+    <div className="detail-drawer-inner rounded-md px-2.5 py-2">
       <p className="section-label mb-1">{label}</p>
       <p
         className={cn(
@@ -399,7 +403,7 @@ function InfoTile({
 
 function NoteCard({ note }: { note: IssueNote }) {
   return (
-    <div className="rounded-md border border-border bg-sidebar px-3 py-2">
+    <div className="detail-drawer-inner rounded-md px-3 py-2">
       <div className="mb-1 flex items-center justify-between gap-2">
         <Badge variant={note.target === "issue" ? "accent" : "neutral"}>{note.target}</Badge>
         <span className="font-mono text-[10px] text-fg-subtle">

@@ -269,15 +269,13 @@ export function filterLogRows(
     search: string;
     level: LogEntry["level"] | "ALL";
     stream: "stdout" | "stderr" | "all";
-    errorsOnly: boolean;
   },
 ): LogEntry[] {
   const search = opts.search.trim().toLowerCase();
 
   return rows.filter((row) => {
     if (opts.app !== "all" && row.app !== opts.app) return false;
-    if (opts.errorsOnly && row.level !== "ERROR") return false;
-    if (!opts.errorsOnly && opts.level !== "ALL" && row.level !== opts.level) return false;
+    if (opts.level !== "ALL" && row.level !== opts.level) return false;
     if (opts.stream !== "all" && row.stream !== opts.stream) return false;
     if (search) {
       const haystack = [row.message, row.revision, row.replica, row.requestId ?? ""]
