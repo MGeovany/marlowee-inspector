@@ -48,7 +48,7 @@ export function LogsTable({
   return (
     <div className="h-full overflow-auto">
       <table className="obs-table w-full border-collapse">
-        <thead className="sticky top-0 z-10 glass-header">
+        <thead className="obs-table-head sticky top-0 z-10">
           <tr>
             <Th className="w-[148px]">Date</Th>
             <Th className="w-[72px]">Status</Th>

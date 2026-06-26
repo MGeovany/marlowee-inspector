@@ -236,6 +236,15 @@
     @apply font-mono text-[12px];
   }
 
+  .obs-table-head {
+    background: #242526;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .obs-table-head th {
+    background: #242526;
+  }
+
   .obs-row {
     @apply transition-colors hover:bg-glass;
   }
@@ -306,6 +315,40 @@
 
   .facet-row-active {
     @apply bg-accent-soft text-fg;
+  }
+
+  /* Unified sidebar */
+  .sidebar-shell {
+    background: linear-gradient(
+      180deg,
+      rgba(28, 29, 31, 0.88) 0%,
+      rgba(12, 13, 14, 0.92) 100%
+    );
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border-right: 1px solid var(--border);
+  }
+
+  .sidebar-nav-item-active {
+    background: rgba(255, 90, 0, 0.1);
+    box-shadow: inset 2px 0 0 var(--accent);
+  }
+
+  .sidebar-service-row {
+    @apply flex items-start gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors;
+  }
+
+  .sidebar-service-row:hover {
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  .sidebar-service-row-active {
+    background: rgba(255, 90, 0, 0.08);
+    box-shadow: inset 2px 0 0 var(--accent-bright);
+  }
+
+  .sidebar-service-row-active:hover {
+    background: rgba(255, 90, 0, 0.1);
   }
 
   .dd-breadcrumb {

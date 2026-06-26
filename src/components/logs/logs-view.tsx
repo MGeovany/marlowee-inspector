@@ -43,7 +43,6 @@ import {
   type IssueStore,
   type NoteTarget,
 } from "@/lib/issues";
-import { AppIconRail } from "@/components/layout/app-icon-rail";
 import { LogDetailPanel } from "./log-detail-panel";
 import { LogFilters, type LogStream } from "./log-filters";
 import { LogsHeader } from "./logs-header";
@@ -309,7 +308,6 @@ export function LogsView({
 
   return (
     <div className="ambient-bg flex h-dvh overflow-hidden bg-bg">
-      <AppIconRail />
       <LogsSidebar
         allowedApps={allowedApps}
         selectedApp={selectedApp}
