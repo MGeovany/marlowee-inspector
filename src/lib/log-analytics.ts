@@ -8,6 +8,7 @@ import {
 } from "./queries";
 import type { QueryTimeWindow } from "./query-time";
 import { effectiveQueryRange } from "./query-time";
+import { parseLog } from "./parsers";
 import type { ContainerApp, LogEntry, LogLevel, LogMetricsResponse } from "./types";
 import { TIME_RANGE_MS } from "./types";
 
@@ -77,7 +78,7 @@ export async function queryLogs(kql: string, range: TimeRange): Promise<LogEntry
     const stream = at(row, cStream).toLowerCase() === "stderr" ? "stderr" : "stdout";
     const message = at(row, cMsg);
     const app = at(row, cApp) as ContainerApp;
-    return {
+    const entry: LogEntry = {
       id: `${app}:${at(row, cRev)}:${at(row, cReplica)}:${i}:${timestamp}`,
       timestamp,
       app,
@@ -87,7 +88,11 @@ export async function queryLogs(kql: string, range: TimeRange): Promise<LogEntry
       replica: at(row, cReplica),
       stream,
       rawPayload: at(row, cRaw) || message,
-    } satisfies LogEntry;
+    };
+    // Per-app parser refines level from JSON payload and extracts extra fields
+    const parsed = parseLog(entry);
+    if (parsed.level) entry.level = parsed.level;
+    return entry;
   });
 }
 

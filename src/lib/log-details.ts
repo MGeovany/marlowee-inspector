@@ -1,3 +1,4 @@
+import { parseLog } from "./parsers";
 import type { LogEntry } from "./types";
 
 export interface LogHttpInfo {
@@ -132,42 +133,53 @@ export function extractLogDetails(entry: LogEntry, masked: boolean): LogDetails 
   let trace: LogTraceInfo = {};
   let formattedRaw = entry.rawPayload;
 
-  try {
-    const parsed = JSON.parse(entry.rawPayload) as Record<string, unknown>;
-    formattedRaw = JSON.stringify(parsed, null, 2);
+  // Try per-app parser first (knows each app's JSON schema)
+  const parsed = parseLog(entry);
+  if (parsed.http) http = mergeHttp(http, parsed.http);
+  if (parsed.trace) trace = parsed.trace;
+  if (parsed.context) Object.assign(context, parsed.context);
 
-    if (parsed.http && typeof parsed.http === "object") {
-      const h = parsed.http as Record<string, unknown>;
-      http = mergeHttp(http, {
-        method: h.method ? String(h.method).toUpperCase() : undefined,
-        path: h.path ? String(h.path) : undefined,
-        status: h.status != null ? Number(h.status) : undefined,
-        latencyMs:
-          h.latency_ms != null
-            ? Number(h.latency_ms)
-            : h.latencyMs != null
-              ? Number(h.latencyMs)
-              : undefined,
-      });
-    }
+  // Fallback: generic JSON parse for apps without explicit parser extraction
+  if (!parsed.http || !parsed.trace || Object.keys(context).length === 0) {
+    try {
+      const json = JSON.parse(entry.rawPayload) as Record<string, unknown>;
+      formattedRaw = JSON.stringify(json, null, 2);
 
-    if (parsed.context && typeof parsed.context === "object") {
-      context = flattenObject(parsed.context as Record<string, unknown>, "context");
-    }
-    if (parsed.request && typeof parsed.request === "object") {
-      const req = flattenObject(parsed.request as Record<string, unknown>, "request");
-      Object.assign(context, req);
-    }
+      if (!parsed.http && json.http && typeof json.http === "object") {
+        const h = json.http as Record<string, unknown>;
+        http = mergeHttp(http, {
+          method: h.method ? String(h.method).toUpperCase() : undefined,
+          path: h.path ? String(h.path) : undefined,
+          status: h.status != null ? Number(h.status) : undefined,
+          latencyMs:
+            h.latency_ms != null
+              ? Number(h.latency_ms)
+              : h.latencyMs != null
+                ? Number(h.latencyMs)
+                : undefined,
+        });
+      }
 
-    if (parsed.trace && typeof parsed.trace === "object") {
-      const t = parsed.trace as Record<string, unknown>;
-      trace = {
-        traceId: t.trace_id ? String(t.trace_id) : t.traceId ? String(t.traceId) : undefined,
-        spanId: t.span_id ? String(t.span_id) : t.spanId ? String(t.spanId) : undefined,
-      };
+      if (Object.keys(context).length === 0) {
+        if (json.context && typeof json.context === "object") {
+          context = flattenObject(json.context as Record<string, unknown>, "context");
+        }
+        if (json.request && typeof json.request === "object") {
+          const req = flattenObject(json.request as Record<string, unknown>, "request");
+          Object.assign(context, req);
+        }
+      }
+
+      if (!parsed.trace && json.trace && typeof json.trace === "object") {
+        const t = json.trace as Record<string, unknown>;
+        trace = {
+          traceId: t.trace_id ? String(t.trace_id) : t.traceId ? String(t.traceId) : undefined,
+          spanId: t.span_id ? String(t.span_id) : t.spanId ? String(t.spanId) : undefined,
+        };
+      }
+    } catch {
+      // plain-text payload — keep message-derived http only
     }
-  } catch {
-    // plain-text payload — keep message-derived http only
   }
 
   const maskedFields = collectMaskedFields(context, masked);

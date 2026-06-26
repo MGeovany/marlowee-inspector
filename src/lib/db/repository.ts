@@ -1,4 +1,4 @@
-import { eq, inArray, desc, and, isNull } from "drizzle-orm";
+import { eq, inArray, desc, and, isNull, gte, lte, sql } from "drizzle-orm";
 import { getDb } from "./client";
 import {
   testSessions,
@@ -472,24 +472,52 @@ export async function createAuditEvent(event: {
     .run();
 }
 
-export async function queryAuditEvents(filters: {
+export interface AuditEventRow {
+  id: string;
+  type: string;
+  actor: string | null;
+  oid: string | null;
+  role: string | null;
+  app: string | null;
+  search: string | null;
+  rowCount: number | null;
+  testSessionId: string | null;
+  details: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export function queryAuditEvents(filters: {
   type?: string;
   actor?: string;
   limit?: number;
-}) {
+  offset?: number;
+  startDate?: string;
+  endDate?: string;
+}): { rows: AuditEventRow[]; total: number } {
   const db = getDb();
-  const conditions = [];
+  const conditions: ReturnType<typeof eq>[] = [];
   if (filters.type) conditions.push(eq(auditEvents.type, filters.type));
   if (filters.actor) conditions.push(eq(auditEvents.actor, filters.actor));
+  if (filters.startDate) conditions.push(gte(auditEvents.createdAt, filters.startDate));
+  if (filters.endDate) conditions.push(lte(auditEvents.createdAt, filters.endDate));
 
-  const query = db
+  const where = conditions.length > 0 ? and(...conditions) : undefined;
+
+  const rows = db
     .select()
     .from(auditEvents)
+    .where(where)
     .orderBy(desc(auditEvents.createdAt))
-    .limit(filters.limit ?? 100);
+    .limit(filters.limit ?? 100)
+    .offset(filters.offset ?? 0)
+    .all();
 
-  if (conditions.length > 0) {
-    return query.where(and(...conditions)).all();
-  }
-  return query.all();
+  const total = db
+    .select({ count: sql<number>`count(*)` })
+    .from(auditEvents)
+    .where(where)
+    .get();
+
+  return { rows, total: total?.count ?? 0 };
 }

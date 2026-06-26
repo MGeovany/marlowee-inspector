@@ -1,6 +1,6 @@
 import { createAuditEvent } from "@/lib/db/repository";
 
-export type AuditEventType = "search" | "raw_search" | "rate_limited" | "denied";
+export type AuditEventType = "search" | "raw_search" | "rate_limited" | "denied" | "raw_copied";
 
 export interface AuditEvent {
   type: AuditEventType;

@@ -3,6 +3,8 @@ import { auth } from "@/auth";
 import { queryAuditEvents } from "@/lib/db/repository";
 import { highestRole } from "@/lib/authz";
 
+const PAGE_SIZE = 50;
+
 export async function GET(req: NextRequest) {
   const session = await auth();
   if (!session?.user) {
@@ -16,8 +18,19 @@ export async function GET(req: NextRequest) {
 
   const type = req.nextUrl.searchParams.get("type") ?? undefined;
   const actor = req.nextUrl.searchParams.get("actor") ?? undefined;
-  const limit = Number(req.nextUrl.searchParams.get("limit")) || 100;
+  const page = Math.max(1, Number(req.nextUrl.searchParams.get("page")) || 1);
+  const limit = Math.min(200, Math.max(1, Number(req.nextUrl.searchParams.get("limit")) || PAGE_SIZE));
+  const startDate = req.nextUrl.searchParams.get("startDate") ?? undefined;
+  const endDate = req.nextUrl.searchParams.get("endDate") ?? undefined;
 
-  const events = await queryAuditEvents({ type, actor, limit });
-  return NextResponse.json(events);
+  const { rows, total } = queryAuditEvents({
+    type,
+    actor,
+    limit,
+    offset: (page - 1) * limit,
+    startDate,
+    endDate,
+  });
+
+  return NextResponse.json({ rows, total, page, pageSize: limit });
 }

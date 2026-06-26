@@ -131,14 +131,21 @@ export function buildLogsQuery(input: BuildQueryInput): string {
     lines.push(`| where Stream == "${escapeKql(input.stream)}"`);
   }
 
-  // Best-effort level detection from the raw line (formats vary per app - see plan section 14).
-  // Default bucket is LOG (uncategorised stdout/stderr).
+  // Level detection: try explicit JSON level field first, then substring heuristics.
   lines.push(
-    "| extend Level = case(" +
+    "| extend _p = parse_json(Message)",
+    "| extend Level = iff(gettype(_p) == \"object\" and _p has \"level\",",
+    "    case(" +
+      `tostring(_p.level) in~ ("error", "fatal"), "ERROR", ` +
+      `tostring(_p.level) in~ ("warn", "warning"), "WARN", ` +
+      `tostring(_p.level) =~ "info", "INFO", ` +
+      `tostring(_p.level) =~ "debug", "DEBUG", ` +
+      '"LOG"),',
+    "    case(" +
       `Message has_any (${ERROR_TERMS.map((t) => `"${t}"`).join(", ")}), "ERROR", ` +
       'Message has_any ("WARN","WARNING"), "WARN", ' +
       'Message has "INFO", "INFO", ' +
-      '"LOG")',
+      '"LOG"))',
   );
 
   if (input.errorsOnly) {
@@ -179,12 +186,20 @@ export function buildLogsSummaryQuery(input: BuildSummaryQueryInput): string {
     '| extend Stream = tolower(tostring(column_ifexists("Stream_s", "stdout")))',
     `| where App in (${appList})`,
     ...kqlTimeWindowLines(input.timeWindow),
-    "| extend Level = case(" +
+    "| extend _p = parse_json(Message)",
+    "| extend Level = iff(gettype(_p) == \"object\" and _p has \"level\",",
+    "    case(" +
+      `tostring(_p.level) in~ ("error", "fatal"), "ERROR", ` +
+      `tostring(_p.level) in~ ("warn", "warning"), "WARN", ` +
+      `tostring(_p.level) =~ "info", "INFO", ` +
+      `tostring(_p.level) =~ "debug", "DEBUG", ` +
+      '"LOG"),',
+    "    case(" +
       `Message has_any (${errorTerms}), "ERROR", ` +
       'Message has_any ("WARN","WARNING"), "WARN", ' +
       'Message has "INFO", "INFO", ' +
-      '"LOG")',
-    ");",
+      '"LOG"))',
+    ";",
     "union",
     `  (Base | summarize TotalLogs = count(), ErrorsCount = countif(Level == "ERROR"), WarningsCount = countif(Level == "WARN"), LastLogTimestamp = max(TimeGenerated) | project Kind = "totals", Key = "", ${nullMetrics.replace("TotalLogs = long(null), ErrorsCount = long(null), WarningsCount = long(null), LastLogTimestamp = datetime(null)", "TotalLogs, ErrorsCount, WarningsCount, LastLogTimestamp")}, ${nullLogFields}),`,
     `  (Base | summarize Count = countif(Level == "ERROR") by App | project Kind = "errorsByApp", Key = App, Count, TotalLogs = long(null), ErrorsCount = long(null), WarningsCount = long(null), LastLogTimestamp = datetime(null), App = "", Level = "", TimeGenerated = datetime(null), Message = "", Revision = "", Replica = "", Stream = ""),`,
@@ -216,11 +231,19 @@ export function buildMetricsQuery(input: BuildSummaryQueryInput): string {
     '| extend Stream = tolower(tostring(column_ifexists("Stream_s", "stdout")))',
     "| where App in (AllowedApps)",
     ...kqlTimeWindowLines(input.timeWindow),
-    "| extend Level = case(" +
+    "| extend _p = parse_json(Message)",
+    "| extend Level = iff(gettype(_p) == \"object\" and _p has \"level\",",
+    "    case(" +
+      `tostring(_p.level) in~ ("error", "fatal"), "ERROR", ` +
+      `tostring(_p.level) in~ ("warn", "warning"), "WARN", ` +
+      `tostring(_p.level) =~ "info", "INFO", ` +
+      `tostring(_p.level) =~ "debug", "DEBUG", ` +
+      '"LOG"),',
+    "    case(" +
       `Message has_any (${errorTerms}), "ERROR", ` +
       'Message has_any ("WARN","WARNING"), "WARN", ' +
       'Message has "INFO", "INFO", ' +
-      '"LOG")',
+      '"LOG"))',
     '| extend LatencyMs = tolong(extract(@"(\\d+)\\s*ms", 1, Message))',
     '| extend ErrorKey = iif(Level == "ERROR", strcat(App, ":", iif(strlen(Message) > 56, substring(Message, 0, 53), Message)), "")',
     ";",

@@ -6,7 +6,6 @@ import { Copy, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { toLogAiBrief } from "@/lib/log-ai-brief";
 import {
   extractLogDetails,
   formatTimestamp,
@@ -84,6 +83,35 @@ export function LogDetailPanel({
     await navigator.clipboard.writeText(text);
     setCopied(target);
     window.setTimeout(() => setCopied(null), 2000);
+  }
+
+  async function copyViaApi(variant: "raw" | "ai") {
+    try {
+      const res = await fetch("/api/logs/copy", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          logId: entry.id,
+          variant,
+          app: entry.app,
+          timestamp: entry.timestamp,
+          message: entry.message,
+          rawPayload: entry.rawPayload,
+          revision: entry.revision,
+          replica: entry.replica,
+          level: entry.level,
+          stream: entry.stream,
+          requestId: entry.requestId,
+        }),
+      });
+      if (!res.ok) return;
+      const text = await res.text();
+      await navigator.clipboard.writeText(text);
+      setCopied(variant);
+      window.setTimeout(() => setCopied(null), 2000);
+    } catch {
+      // fallback — keep client-side copy working
+    }
   }
 
   function addNote(target: NoteTarget) {
@@ -209,7 +237,7 @@ export function LogDetailPanel({
           <Button
             variant="default"
             size="sm"
-            onClick={() => void copyText("ai", toLogAiBrief(entry, masked))}
+            onClick={() => void copyViaApi("ai")}
           >
             <Copy className="h-3 w-3" />
             {copied === "ai" ? "Copied" : "Copy for AI"}
@@ -328,7 +356,7 @@ export function LogDetailPanel({
               <h3 className="section-label">Raw log</h3>
               <button
                 type="button"
-                onClick={() => void copyText("raw", details.formattedRaw)}
+                onClick={() => void copyViaApi("raw")}
                 className="inline-flex items-center gap-1 text-[10px] uppercase tracking-[0.04em] text-fg-subtle hover:text-fg"
               >
                 <Copy className="h-3 w-3" />
