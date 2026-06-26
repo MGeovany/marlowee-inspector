@@ -1,4 +1,4 @@
-import { DefaultAzureCredential, ManagedIdentityCredential } from "@azure/identity";
+import { DefaultAzureCredential } from "@azure/identity";
 import { Durations, LogsQueryClient, LogsQueryResultStatus } from "@azure/monitor-query";
 import type { TimeRange } from "./authz";
 import type { ContainerApp, LogEntry, LogLevel } from "./types";
@@ -10,8 +10,9 @@ import type { ContainerApp, LogEntry, LogLevel } from "./types";
  */
 
 function credential() {
-  const clientId = process.env.AZURE_MANAGED_IDENTITY_CLIENT_ID;
-  return clientId ? new ManagedIdentityCredential({ clientId }) : new DefaultAzureCredential();
+  return new DefaultAzureCredential({
+    managedIdentityClientId: process.env.AZURE_MANAGED_IDENTITY_CLIENT_ID,
+  });
 }
 
 let _client: LogsQueryClient | null = null;
@@ -61,18 +62,23 @@ export async function queryLogs(kql: string, range: TimeRange): Promise<LogEntry
   const cRev = idx("Revision");
   const cReplica = idx("Replica");
   const cStream = idx("Stream");
-  const cRaw = idx("Raw");
+  const cRaw = idx("RawPayload");
 
-  const at = (row: unknown[], i: number) => (i >= 0 ? String(row[i] ?? "") : "");
+  const at = (row: unknown[], i: number) => (i >= 0 ? stringifyCell(row[i]) : "");
+  const timestampAt = (row: unknown[], i: number) => {
+    const value = i >= 0 ? row[i] : undefined;
+    return value instanceof Date ? value.toISOString() : stringifyCell(value);
+  };
 
   return table.rows.map((row, i) => {
-    const timestamp = at(row, cTime);
-    const stream = at(row, cStream) === "stderr" ? "stderr" : "stdout";
+    const timestamp = timestampAt(row, cTime);
+    const stream = at(row, cStream).toLowerCase() === "stderr" ? "stderr" : "stdout";
     const message = at(row, cMsg);
+    const app = at(row, cApp) as ContainerApp;
     return {
-      id: `${at(row, cApp)}:${i}:${timestamp}`,
+      id: `${app}:${at(row, cRev)}:${at(row, cReplica)}:${i}:${timestamp}`,
       timestamp,
-      app: at(row, cApp) as ContainerApp,
+      app,
       level: normalizeLevel(at(row, cLevel) || "LOG"),
       message,
       revision: at(row, cRev),
@@ -81,4 +87,11 @@ export async function queryLogs(kql: string, range: TimeRange): Promise<LogEntry
       rawPayload: at(row, cRaw) || message,
     } satisfies LogEntry;
   });
+}
+
+function stringifyCell(value: unknown): string {
+  if (value == null) return "";
+  if (value instanceof Date) return value.toISOString();
+  if (typeof value === "object") return JSON.stringify(value);
+  return String(value);
 }

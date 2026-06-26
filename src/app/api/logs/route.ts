@@ -2,36 +2,39 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/auth";
 import { capabilitiesFor, canReadApp, clampRange, highestRole } from "@/lib/authz";
-import { buildLogsQuery, MAX_ROWS } from "@/lib/queries";
+import { ALLOWED_APPS, buildLogsQuery, MAX_ROWS } from "@/lib/queries";
 import { queryLogs } from "@/lib/log-analytics";
 import { maskString } from "@/lib/masking";
-import { queryMockLogs } from "@/lib/mock-logs";
 import { rateLimit } from "@/lib/rate-limit";
 import { audit } from "@/lib/audit";
 import type { LogEntry } from "@/lib/types";
 
-/**
- * Mock phase (default): serve the local mock dataset instead of querying Azure.
- * Azure is only used when explicitly opted into with LOGS_SOURCE=azure, so a
- * configured workspace id + an active `az login` can never hit real logs by
- * accident during the UI phase. The full authz/masking/audit/rate-limit
- * pipeline runs regardless of the data source.
- */
-const USE_MOCK = process.env.LOGS_SOURCE !== "azure";
+const BoolParam = z
+  .enum(["true", "false"])
+  .default("false")
+  .transform((value) => value === "true");
+
+const OptionalTextParam = (max: number) =>
+  z
+    .string()
+    .trim()
+    .max(max)
+    .optional()
+    .transform((value) => (value ? value : undefined));
 
 const QuerySchema = z.object({
-  app: z.string().min(1),
+  app: z.enum(ALLOWED_APPS),
   range: z.enum(["1h", "24h", "7d"]).default("24h"),
-  search: z.string().max(256).optional(),
+  search: OptionalTextParam(256),
   level: z.enum(["ERROR", "WARN", "INFO", "LOG"]).optional(),
   stream: z.enum(["stdout", "stderr", "all"]).default("all"),
-  requestId: z.string().max(128).optional(),
-  errorsOnly: z.boolean().default(false),
-  raw: z.boolean().default(false),
-  limit: z.number().int().min(1).max(MAX_ROWS).default(200),
+  requestId: OptionalTextParam(128),
+  errorsOnly: BoolParam,
+  raw: BoolParam,
+  limit: z.coerce.number().int().min(1).max(MAX_ROWS).default(200),
 });
 
-export async function POST(req: NextRequest) {
+export async function GET(req: NextRequest) {
   // 1. Authn
   const session = await auth();
   if (!session?.user) {
@@ -49,7 +52,7 @@ export async function POST(req: NextRequest) {
   }
 
   // 3. Validate input
-  const parsed = QuerySchema.safeParse(await req.json().catch(() => ({})));
+  const parsed = QuerySchema.safeParse(Object.fromEntries(req.nextUrl.searchParams));
   if (!parsed.success) {
     return NextResponse.json({ error: "invalid request", details: parsed.error.flatten() }, { status: 400 });
   }
@@ -75,33 +78,19 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // 6. Build + run query (mock dataset, or read-only KQL against Azure)
+  // 6. Build + run a read-only allowlisted KQL query against Azure.
   try {
-    let rows: LogEntry[];
-    if (USE_MOCK) {
-      rows = queryMockLogs({
-        app,
-        range,
-        search,
-        errorsOnly,
-        level: effectiveLevel,
-        stream,
-        requestId,
-        limit,
-      });
-    } else {
-      const kql = buildLogsQuery({
-        app,
-        range,
-        search,
-        errorsOnly,
-        level: effectiveLevel,
-        stream,
-        requestId,
-        limit,
-      });
-      rows = await queryLogs(kql, range);
-    }
+    const kql = buildLogsQuery({
+      app,
+      range,
+      search,
+      errorsOnly,
+      level: effectiveLevel,
+      stream,
+      requestId,
+      limit,
+    });
+    const rows: LogEntry[] = await queryLogs(kql, range);
 
     // Mask both the message and the raw payload server-side (raw mode = Admin only).
     const masked = raw
@@ -127,12 +116,13 @@ export async function POST(req: NextRequest) {
       rows: masked,
       range,
       masked: !raw,
-      source: USE_MOCK ? "mock" : "azure",
+      source: "azure",
       total: masked.length,
     });
   } catch (err) {
+    console.error("Log Analytics query failed", err);
     return NextResponse.json(
-      { error: "query failed", message: err instanceof Error ? err.message : "unknown" },
+      { error: "query failed" },
       { status: 502 },
     );
   }

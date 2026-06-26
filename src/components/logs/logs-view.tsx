@@ -60,7 +60,7 @@ export function LogsView({
   const [status, setStatus] = useState<LogsStatus>("idle");
   const [allRows, setAllRows] = useState<LogEntry[]>([]);
   const [masked, setMasked] = useState(true);
-  const [source, setSource] = useState<"mock" | "azure">("mock");
+  const [source, setSource] = useState<"mock" | "azure">("azure");
   const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [queryLatencyMs, setQueryLatencyMs] = useState(0);
@@ -77,17 +77,18 @@ export function LogsView({
     try {
       const results = await Promise.all(
         allowedApps.map(async (app) => {
-          const res = await fetch("/api/logs", {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({
-              app,
-              range: timeRange,
-              stream,
-              raw,
-              limit: 300,
-            }),
+          const params = new URLSearchParams({
+            app,
+            range: timeRange,
+            stream,
+            raw: String(raw),
+            errorsOnly: String(errorsOnly),
+            limit: "300",
           });
+          if (search.trim()) params.set("search", search.trim());
+          if (level !== "ALL") params.set("level", level);
+
+          const res = await fetch(`/api/logs?${params.toString()}`);
           if (!res.ok) {
             const body = await res.json().catch(() => ({}));
             throw new Error(body.error ?? `Request failed (${res.status})`);
@@ -111,7 +112,7 @@ export function LogsView({
       setError(e instanceof Error ? e.message : "unknown error");
       setStatus("error");
     }
-  }, [allowedApps, timeRange, stream, raw]);
+  }, [allowedApps, timeRange, stream, raw, errorsOnly, level, search]);
 
   useEffect(() => {
     const t = setTimeout(() => void fetchLogs(), 250);

@@ -57,35 +57,39 @@ export function buildLogsQuery(input: BuildQueryInput): string {
   const limit = Math.min(Math.max(input.limit ?? DEFAULT_ROWS, 1), MAX_ROWS);
   const lines: string[] = [
     CONSOLE_TABLE,
-    `| where ContainerAppName_s == "${escapeKql(input.app)}"`,
+    '| extend App = tostring(column_ifexists("ContainerAppName_s", ""))',
+    '| extend Message = tostring(column_ifexists("Log_s", ""))',
+    '| extend Revision = tostring(column_ifexists("RevisionName_s", ""))',
+    '| extend Replica = tostring(column_ifexists("ContainerName_s", ""))',
+    '| extend Stream = tolower(tostring(column_ifexists("Stream_s", "stdout")))',
+    `| where App == "${escapeKql(input.app)}"`,
   ];
 
-  if (input.errorsOnly) {
-    const terms = ERROR_TERMS.map((t) => `"${t}"`).join(", ");
-    lines.push(`| where Log_s has_any (${terms})`);
-  }
-
   if (input.search && input.search.trim().length > 0) {
-    lines.push(`| where Log_s contains "${escapeKql(input.search)}"`);
+    lines.push(`| where Message contains "${escapeKql(input.search)}"`);
   }
 
   if (input.requestId && input.requestId.trim().length > 0) {
-    lines.push(`| where Log_s contains "${escapeKql(input.requestId)}"`);
+    lines.push(`| where Message contains "${escapeKql(input.requestId)}"`);
   }
 
   if (input.stream && input.stream !== "all") {
-    lines.push(`| where Stream_s == "${escapeKql(input.stream)}"`);
+    lines.push(`| where Stream == "${escapeKql(input.stream)}"`);
   }
 
   // Best-effort level detection from the raw line (formats vary per app - see plan section 14).
   // Default bucket is LOG (uncategorised stdout/stderr).
   lines.push(
     "| extend Level = case(" +
-      'Log_s has_any ("ERROR","FATAL","panic","Exception","stacktrace"), "ERROR", ' +
-      'Log_s has_any ("WARN","WARNING"), "WARN", ' +
-      'Log_s has "INFO", "INFO", ' +
+      `Message has_any (${ERROR_TERMS.map((t) => `"${t}"`).join(", ")}), "ERROR", ` +
+      'Message has_any ("WARN","WARNING"), "WARN", ' +
+      'Message has "INFO", "INFO", ' +
       '"LOG")',
   );
+
+  if (input.errorsOnly) {
+    lines.push('| where Level == "ERROR"');
+  }
 
   // Level filter only when not in errorsOnly mode (errorsOnly already narrows to errors).
   if (input.level && !input.errorsOnly) {
@@ -93,8 +97,7 @@ export function buildLogsQuery(input: BuildQueryInput): string {
   }
 
   lines.push(
-    "| project TimeGenerated, App = ContainerAppName_s, Level, Message = Log_s, " +
-      "Revision = RevisionName_s, Replica = ContainerName_s, Stream = Stream_s, Raw = Log_s",
+    "| project TimeGenerated, App, Level, Stream, Message, Revision, Replica, RawPayload = Message",
   );
   lines.push("| order by TimeGenerated desc");
   lines.push(`| take ${limit}`);

@@ -164,9 +164,19 @@ export function computeSidePanel(rows: LogEntry[]): SidePanelData {
 
   const recentActivity = [...rows]
     .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
-    .slice(0, 14);
+    .slice(0, 8);
 
-  return { detectedErrors, recentActivity };
+  const latestIncidents: LatestIncident[] = detectedErrors.slice(0, 3).map((de, i) => ({
+    id: `INC-${String(2840 + i + 1)}`,
+    severity: de.count >= 8 ? "SEV-2" : "SEV-3",
+    status:
+      de.trend === "up" ? "INVESTIGATING" : de.trend === "down" ? "MONITORING" : "RESOLVED",
+    title: de.label,
+    app: de.app,
+    sample: de.sample,
+  }));
+
+  return { latestIncidents, detectedErrors, recentActivity };
 }
 
 export function computeAppStats(rows: LogEntry[], app: ContainerApp): AppStats {
