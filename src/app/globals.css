@@ -400,32 +400,73 @@
   }
 
   .query-bar {
-    @apply relative flex min-h-9 items-center gap-2 overflow-hidden rounded-full border border-border bg-[rgba(10,11,12,0.82)] px-3 backdrop-blur-md;
+    @apply relative flex min-h-[38px] items-center gap-0 overflow-hidden rounded-[var(--radius-md)] px-2.5 backdrop-blur-md;
+    background: linear-gradient(
+      180deg,
+      rgba(32, 34, 36, 0.78) 0%,
+      rgba(14, 15, 16, 0.92) 100%
+    );
+    border: 1px solid rgba(255, 255, 255, 0.09);
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.05),
-      0 0 0 1px rgba(0, 217, 115, 0.05);
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.35),
+      0 1px 2px rgba(0, 0, 0, 0.28);
     transition:
-      border-color 220ms ease-out,
-      box-shadow 220ms ease-out,
-      background-color 220ms ease-out;
+      border-color 240ms ease-out,
+      box-shadow 240ms ease-out,
+      background 240ms ease-out;
   }
 
-  .query-bar:hover:not(:focus-within) {
-    border-color: rgba(255, 255, 255, 0.12);
-    background: rgba(12, 13, 14, 0.9);
+  .query-bar::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    opacity: 0;
+    background: linear-gradient(
+      135deg,
+      rgba(0, 217, 115, 0.14) 0%,
+      transparent 42%,
+      transparent 100%
+    );
+    transition: opacity 240ms ease-out;
   }
 
-  .query-bar:focus-within {
-    border-color: rgba(0, 217, 115, 0.45);
-    background: rgba(6, 8, 7, 0.94);
+  .query-bar:hover:not(.query-bar-focused) {
+    border-color: rgba(255, 255, 255, 0.13);
+    background: linear-gradient(
+      180deg,
+      rgba(36, 38, 40, 0.82) 0%,
+      rgba(16, 17, 18, 0.94) 100%
+    );
+  }
+
+  .query-bar-focused {
+    border-color: rgba(0, 217, 115, 0.38);
+    background: linear-gradient(
+      180deg,
+      rgba(10, 14, 12, 0.94) 0%,
+      rgba(6, 8, 7, 0.98) 100%
+    );
     box-shadow:
-      inset 0 1px 0 rgba(120, 255, 190, 0.1),
-      0 0 0 1px rgba(0, 217, 115, 0.32),
-      0 0 28px rgba(0, 217, 115, 0.14);
+      inset 0 1px 0 rgba(120, 255, 190, 0.12),
+      inset 0 0 0 1px rgba(0, 217, 115, 0.08),
+      0 0 0 1px rgba(0, 217, 115, 0.22),
+      0 0 32px rgba(0, 217, 115, 0.1),
+      0 8px 24px rgba(0, 0, 0, 0.35);
+  }
+
+  .query-bar-focused::after {
+    opacity: 1;
+  }
+
+  .query-bar-active:not(.query-bar-focused) {
+    border-color: rgba(0, 217, 115, 0.18);
   }
 
   .query-bar-icon {
-    @apply flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-accent-bright;
+    @apply flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-accent-bright;
     transition:
       color 220ms ease-out,
       background-color 220ms ease-out,
@@ -433,24 +474,42 @@
       transform 180ms var(--motion-ease);
   }
 
-  .query-bar:focus-within .query-bar-icon {
-    color: var(--accent-bright);
-    background: rgba(0, 217, 115, 0.14);
-    box-shadow: 0 0 14px rgba(0, 217, 115, 0.28);
-    transform: scale(1.04);
+  .query-bar-focused .query-bar-icon {
+    color: #040506;
+    background: linear-gradient(135deg, var(--accent-bright), var(--accent));
+    box-shadow: 0 0 16px rgba(0, 217, 115, 0.35);
+    transform: scale(1.02);
+  }
+
+  .query-bar-divider {
+    @apply mx-2 h-4 w-px shrink-0 bg-border;
+    transition: background-color 220ms ease-out;
+  }
+
+  .query-bar-divider-trail {
+    @apply mx-2.5;
+  }
+
+  .query-bar-focused .query-bar-divider {
+    background: rgba(0, 217, 115, 0.22);
+  }
+
+  .query-bar-field {
+    @apply relative flex min-w-0 items-center gap-2;
   }
 
   .query-bar-input {
-    @apply min-w-0 flex-1 border-0 bg-transparent py-1.5 font-mono text-[12px] leading-none text-fg outline-none ring-0;
+    @apply min-w-0 flex-1 border-0 bg-transparent py-2 font-mono text-[12px] leading-snug text-fg outline-none ring-0;
+    caret-color: var(--accent-bright);
   }
 
   .query-bar-input::placeholder {
-    color: var(--fg-subtle);
+    color: rgba(153, 153, 153, 0.72);
     transition: color 200ms ease-out;
   }
 
-  .query-bar:focus-within .query-bar-input::placeholder {
-    color: rgba(153, 153, 153, 0.65);
+  .query-bar-focused .query-bar-input::placeholder {
+    color: rgba(153, 153, 153, 0.45);
   }
 
   .query-bar-input::-webkit-search-decoration,
@@ -458,24 +517,49 @@
     display: none;
   }
 
-  .query-bar-kbd {
-    @apply hidden shrink-0 rounded-md border border-border bg-[rgba(255,255,255,0.04)] px-1.5 py-0.5 font-mono text-[10px] leading-none text-fg-subtle sm:inline;
-    transition: opacity 180ms ease-out;
+  .query-bar-hints {
+    @apply items-center gap-1;
   }
 
-  .query-bar:focus-within .query-bar-kbd {
+  .query-bar-hint {
+    @apply motion-press rounded-sm border border-border bg-[rgba(255,255,255,0.03)] px-1.5 py-0.5 font-mono text-[10px] leading-none text-fg-subtle;
+    transition:
+      border-color var(--motion-base) ease-out,
+      color var(--motion-base) ease-out,
+      background-color var(--motion-base) ease-out;
+  }
+
+  .query-bar-hint:hover {
+    border-color: rgba(0, 217, 115, 0.28);
+    color: var(--accent-bright);
+    background: rgba(0, 217, 115, 0.08);
+  }
+
+  .query-bar-kbd {
+    @apply hidden shrink-0 rounded-md border border-border bg-[rgba(255,255,255,0.04)] px-2 py-1 font-mono text-[10px] leading-none tracking-[0.02em] text-fg-subtle sm:inline;
+    box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.25);
+    transition:
+      opacity 180ms ease-out,
+      border-color 180ms ease-out;
+  }
+
+  .query-bar-focused .query-bar-kbd {
     opacity: 0;
+    pointer-events: none;
   }
 
   .query-bar-clear {
-    @apply motion-press flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-fg-subtle;
+    @apply motion-press flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-transparent text-fg-subtle;
     transition:
       background-color var(--motion-base) ease-out,
+      border-color var(--motion-base) ease-out,
       color var(--motion-base) ease-out;
   }
 
   .query-bar-clear:hover {
-    @apply bg-glass text-fg;
+    border-color: rgba(0, 217, 115, 0.28);
+    background: rgba(0, 217, 115, 0.1);
+    color: var(--accent-bright);
   }
 
   .facet-row {
