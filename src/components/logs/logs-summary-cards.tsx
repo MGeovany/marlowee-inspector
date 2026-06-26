@@ -1,64 +1,134 @@
 "use client";
 
-import { formatDistanceToNow } from "date-fns";
-
 import { cn } from "@/lib/utils";
 import type { DashboardSummary } from "@/lib/log-stats";
+import { Sparkline } from "./sparkline";
 
 interface LogsSummaryCardsProps {
   summary: DashboardSummary;
   loading: boolean;
+  live: boolean;
 }
 
 const CARDS = [
-  { key: "openErrors", label: "Open Errors", tone: "error" as const },
-  { key: "warnings", label: "Warnings", tone: "warn" as const },
-  { key: "logsPerMin", label: "Logs/min", tone: "info" as const },
-  { key: "activeApps", label: "Active Apps", tone: "neutral" as const },
-  { key: "lastError", label: "Last Error", tone: "error" as const, wide: true },
-  { key: "queryLatency", label: "Query Latency", tone: "accent" as const },
-] as const;
+  {
+    key: "openErrors" as const,
+    label: "Open errors",
+    tone: "error" as const,
+    accent: "border-l-level-error",
+    sparkKey: "openErrors" as const,
+  },
+  {
+    key: "activeIncidents" as const,
+    label: "Active incidents",
+    tone: "warn" as const,
+    accent: "border-l-level-warn",
+    sparkKey: "activeIncidents" as const,
+  },
+  {
+    key: "logsPerMin" as const,
+    label: "Logs / min",
+    tone: "warn" as const,
+    accent: "border-l-[var(--orange)]",
+    sparkKey: "logsPerMin" as const,
+  },
+  {
+    key: "avgResponse" as const,
+    label: "Avg response",
+    tone: "success" as const,
+    accent: "border-l-[var(--green)]",
+    sparkKey: "avgResponse" as const,
+  },
+];
 
-const TONE: Record<string, string> = {
-  error: "text-level-error border-[rgba(239,83,80,0.25)]",
-  warn: "text-level-warn border-[rgba(212,168,67,0.25)]",
-  info: "text-level-info border-[rgba(83,168,252,0.25)]",
-  accent: "text-[#b8b5ff] border-[rgba(106,102,255,0.25)]",
-  neutral: "text-fg border-border",
-};
-
-export function LogsSummaryCards({ summary, loading }: LogsSummaryCardsProps) {
-  const values: Record<string, string> = {
+export function LogsSummaryCards({ summary, loading, live }: LogsSummaryCardsProps) {
+  const values: Record<(typeof CARDS)[number]["key"], string> = {
     openErrors: String(summary.openErrors),
-    warnings: String(summary.warnings),
-    logsPerMin: String(summary.logsPerMin),
-    activeApps: String(summary.activeApps),
-    lastError: summary.lastError
-      ? formatDistanceToNow(new Date(summary.lastError.timeGenerated), { addSuffix: true })
-      : "None",
-    queryLatency: `${summary.queryLatencyMs}ms`,
+    activeIncidents: String(summary.activeIncidents),
+    logsPerMin: summary.logsPerMin.toLocaleString(),
+    avgResponse: `${summary.avgResponseMs} ms`,
   };
 
   return (
-    <div className="grid shrink-0 grid-cols-2 gap-2 border-b border-border bg-workspace px-4 py-3 lg:grid-cols-6">
+    <div className="grid shrink-0 grid-cols-2 gap-2 border-b border-border bg-workspace px-4 py-3 xl:grid-cols-4">
       {CARDS.map((card) => (
-        <div
+        <MetricCard
           key={card.key}
-          className={cn(
-            "metric-card",
-            TONE[card.tone],
-            "wide" in card && card.wide && "lg:col-span-2",
-          )}
-        >
-          <p className="metric-label">{card.label}</p>
-          <p className={cn("metric-value", loading && "opacity-50")}>{values[card.key]}</p>
-          {card.key === "lastError" && summary.lastError && (
-            <p className="mt-1 truncate font-mono text-[10px] text-fg-subtle">
-              {summary.lastError.app} · {summary.lastError.message.slice(0, 48)}
-            </p>
-          )}
-        </div>
+          label={card.label}
+          value={values[card.key]}
+          accent={card.accent}
+          tone={card.tone}
+          loading={loading}
+          sparkline={summary.sparklines[card.sparkKey]}
+          badge={badgeFor(card.key, summary, live)}
+        />
       ))}
+    </div>
+  );
+}
+
+function badgeFor(
+  key: (typeof CARDS)[number]["key"],
+  summary: DashboardSummary,
+  live: boolean,
+): { text: string; className: string } | null {
+  if (key === "openErrors" && summary.openErrorsDeltaPct !== null) {
+    const up = summary.openErrorsDeltaPct >= 0;
+    return {
+      text: `${up ? "+" : ""}${summary.openErrorsDeltaPct}%`,
+      className: up ? "text-level-error" : "text-[var(--green)]",
+    };
+  }
+  if (key === "activeIncidents" && summary.activeIncidents > 0) {
+    return { text: "active", className: "text-level-warn" };
+  }
+  if (key === "logsPerMin" && live) {
+    return { text: "live", className: "text-[var(--green)]" };
+  }
+  if (key === "avgResponse" && summary.avgResponseDeltaPct !== null) {
+    const down = summary.avgResponseDeltaPct <= 0;
+    return {
+      text: `${summary.avgResponseDeltaPct > 0 ? "+" : ""}${summary.avgResponseDeltaPct}%`,
+      className: down ? "text-[var(--green)]" : "text-level-warn",
+    };
+  }
+  return null;
+}
+
+function MetricCard({
+  label,
+  value,
+  accent,
+  tone,
+  loading,
+  sparkline,
+  badge,
+}: {
+  label: string;
+  value: string;
+  accent: string;
+  tone: "error" | "warn" | "info" | "success";
+  loading: boolean;
+  sparkline: number[];
+  badge: { text: string; className: string } | null;
+}) {
+  return (
+    <div className={cn("metric-card-spark border-l-[3px] pl-3", accent)}>
+      <div className="flex items-start justify-between gap-2">
+        <p className="metric-label">{label}</p>
+        {badge && (
+          <span className={cn("font-mono text-[10px] font-medium tabular-nums", badge.className)}>
+            {badge.text === "live" && (
+              <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-[var(--green)] shadow-[0_0_6px_rgba(83,192,135,0.5)]" />
+            )}
+            {badge.text}
+          </span>
+        )}
+      </div>
+      <div className="mt-2 flex items-end justify-between gap-3">
+        <p className={cn("metric-value", loading && "opacity-50")}>{value}</p>
+        <Sparkline values={sparkline} tone={tone} className="shrink-0" />
+      </div>
     </div>
   );
 }

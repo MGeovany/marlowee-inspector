@@ -90,14 +90,23 @@ export async function POST(req: NextRequest) {
         limit,
       });
     } else {
-      const kql = buildLogsQuery({ app, range, search, errorsOnly, level: effectiveLevel, limit });
+      const kql = buildLogsQuery({
+        app,
+        range,
+        search,
+        errorsOnly,
+        level: effectiveLevel,
+        stream,
+        requestId,
+        limit,
+      });
       rows = await queryLogs(kql, range);
     }
 
     // Mask both the message and the raw payload server-side (raw mode = Admin only).
     const masked = raw
       ? rows
-      : rows.map((r) => ({ ...r, message: maskString(r.message), raw: maskString(r.raw) }));
+      : rows.map((r) => ({ ...r, message: maskString(r.message), rawPayload: maskString(r.rawPayload) }));
 
     // 7. Audit
     audit({

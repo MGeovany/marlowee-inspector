@@ -9,21 +9,17 @@ import type { AppStats } from "@/lib/log-stats";
 import type { ContainerApp } from "@/lib/types";
 import brandIcon from "@/app/icon.png";
 
+export type AppSelection = ContainerApp | "all";
+
 interface LogsSidebarProps {
   allowedApps: ContainerApp[];
-  selectedApp: ContainerApp | null;
-  onSelectApp: (app: ContainerApp) => void;
+  selectedApp: AppSelection;
+  onSelectApp: (app: AppSelection) => void;
   appStats: AppStats[];
   userEmail: string | null;
   role: string | null;
   signOutAction: () => Promise<void>;
 }
-
-const HEALTH: Record<AppStats["health"], { label: string; variant: "info" | "warn" | "error" }> = {
-  healthy: { label: "healthy", variant: "info" },
-  warning: { label: "warning", variant: "warn" },
-  error: { label: "error", variant: "error" },
-};
 
 export function LogsSidebar({
   allowedApps,
@@ -35,6 +31,7 @@ export function LogsSidebar({
   signOutAction,
 }: LogsSidebarProps) {
   const statsByApp = new Map(appStats.map((s) => [s.app, s]));
+  const totalErrors = appStats.reduce((sum, s) => sum + s.errors, 0);
 
   return (
     <aside className="flex w-[292px] shrink-0 flex-col border-r border-border bg-sidebar">
@@ -56,39 +53,30 @@ export function LogsSidebar({
 
       <div className="flex-1 overflow-y-auto px-4 pt-8">
         <p className="section-label mb-3">Container apps</p>
-        <div className="space-y-1.5">
+        <div className="space-y-1">
           {allowedApps.length === 0 && (
             <p className="px-1 text-micro text-fg-muted">No apps for your role.</p>
           )}
-          {allowedApps.map((app) => {
-            const active = app === selectedApp;
-            const stats = statsByApp.get(app);
-            const health = stats ? HEALTH[stats.health] : HEALTH.healthy;
 
+          {allowedApps.length > 0 && (
+            <AppRow
+              label="All apps"
+              errors={totalErrors}
+              active={selectedApp === "all"}
+              onClick={() => onSelectApp("all")}
+            />
+          )}
+
+          {allowedApps.map((app) => {
+            const stats = statsByApp.get(app);
             return (
-              <button
+              <AppRow
                 key={app}
-                type="button"
+                label={app}
+                errors={stats?.errors ?? 0}
+                active={selectedApp === app}
                 onClick={() => onSelectApp(app)}
-                className={cn(
-                  "flex w-full flex-col gap-1.5 rounded-sm border border-transparent border-l-[3px] px-3 py-2.5 text-left transition-colors",
-                  active
-                    ? "border-l-accent bg-accent-soft"
-                    : "border-l-transparent hover:bg-sidebar-hover",
-                )}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <span className="truncate font-mono text-micro text-fg">{app}</span>
-                  <Badge variant={health.variant} className="shrink-0">
-                    {health.label}
-                  </Badge>
-                </div>
-                <div className="flex items-center gap-3 font-mono text-[10px] tabular-nums text-fg-subtle">
-                  <span>{stats?.total ?? 0} logs</span>
-                  <span className="text-level-error">{stats?.errors ?? 0} err</span>
-                  <span className="text-level-warn">{stats?.warnings ?? 0} warn</span>
-                </div>
-              </button>
+              />
             );
           })}
         </div>
@@ -120,5 +108,54 @@ export function LogsSidebar({
         </div>
       </div>
     </aside>
+  );
+}
+
+function AppRow({
+  label,
+  errors,
+  active,
+  onClick,
+}: {
+  label: string;
+  errors: number;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "flex w-full items-center gap-2.5 rounded-sm border border-transparent border-l-[3px] px-3 py-2.5 text-left transition-colors",
+        active
+          ? "border-l-accent bg-accent-soft"
+          : "border-l-transparent hover:bg-sidebar-hover",
+      )}
+    >
+      <span
+        className={cn(
+          "h-1.5 w-1.5 shrink-0 rounded-full",
+          errors > 0 ? "bg-level-error shadow-[0_0_6px_rgba(239,83,80,0.5)]" : "bg-fg-subtle",
+        )}
+      />
+      <span className="min-w-0 flex-1 truncate font-mono text-micro text-fg">{label}</span>
+      <ErrorCount count={errors} />
+    </button>
+  );
+}
+
+function ErrorCount({ count }: { count: number }) {
+  return (
+    <span
+      className={cn(
+        "flex h-5 min-w-[20px] shrink-0 items-center justify-center rounded-full border px-1 font-mono text-[10px] font-semibold tabular-nums",
+        count > 0
+          ? "border-[rgba(239,83,80,0.35)] text-level-error"
+          : "border-border text-fg-subtle",
+      )}
+    >
+      {count}
+    </span>
   );
 }

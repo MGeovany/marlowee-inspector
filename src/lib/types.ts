@@ -15,7 +15,7 @@ export type TimeRange = "1h" | "24h" | "7d";
 /** A single log line, enriched with the fields the detail sheet needs. */
 export interface LogEntry {
   id: string;
-  timeGenerated: string; // ISO 8601
+  timestamp: string; // ISO 8601
   app: ContainerApp;
   level: LogLevel;
   message: string;
@@ -24,7 +24,7 @@ export interface LogEntry {
   stream: "stdout" | "stderr";
   requestId?: string;
   /** Full raw log payload (structured JSON or plain text) shown in the detail sheet. */
-  raw: string;
+  rawPayload: string;
 }
 
 /** Filter state owned by the client and sent to /api/logs. */

@@ -57,6 +57,34 @@
     @apply bg-accent-soft text-[#b8b5ff];
   }
 
+  .level-chip {
+    @apply chip font-mono font-semibold uppercase tracking-[0.03em];
+  }
+
+  .level-chip-error.chip-active {
+    @apply border-[rgba(239,83,80,0.35)] bg-[rgba(239,83,80,0.12)] text-level-error;
+  }
+
+  .level-chip-warn.chip-active {
+    @apply border-[rgba(212,168,67,0.35)] bg-[rgba(212,168,67,0.12)] text-level-warn;
+  }
+
+  .level-chip-info.chip-active {
+    @apply border-[rgba(83,168,252,0.35)] bg-[rgba(83,168,252,0.12)] text-level-info;
+  }
+
+  .level-chip-log.chip-active {
+    @apply border-border-strong bg-[rgba(255,255,255,0.08)] text-fg-muted;
+  }
+
+  .filter-toolbar {
+    @apply flex shrink-0 flex-wrap items-center gap-2 border-b border-border bg-sidebar px-4 py-2;
+  }
+
+  .filter-segment {
+    @apply inline-flex items-center rounded-sm border border-border bg-bg p-0.5;
+  }
+
   .panel-head {
     @apply border-b border-border px-3 py-2.5;
   }
@@ -79,5 +107,44 @@
 
   .log-row-error {
     @apply bg-[rgba(239,83,80,0.08)];
+  }
+
+  .metric-card {
+    @apply rounded-md border bg-panel px-3 py-2.5;
+  }
+
+  .metric-card-spark {
+    @apply rounded-md border border-border bg-panel py-2.5 pr-3;
+  }
+
+  .metric-label {
+    @apply text-[10px] font-semibold uppercase tracking-[0.06em] text-fg-subtle;
+  }
+
+  .metric-value {
+    @apply mt-1 font-mono text-lg font-medium tabular-nums leading-none;
+  }
+
+  .obs-table {
+    @apply font-mono text-[11px];
+  }
+
+  .obs-row {
+    @apply transition-colors hover:bg-sidebar-hover;
+  }
+
+  .obs-row-selected {
+    @apply bg-accent-soft outline outline-1 outline-[rgba(106,102,255,0.3)];
+  }
+
+  .obs-row-error {
+    @apply bg-[rgba(239,83,80,0.06)];
+  }
+
+  .workspace-grid {
+    background-image:
+      linear-gradient(rgba(106, 102, 255, 0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(106, 102, 255, 0.025) 1px, transparent 1px);
+    background-size: 28px 28px;
   }
 }

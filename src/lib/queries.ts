@@ -9,17 +9,19 @@ import type { LogLevel } from "./types";
  *  - queries are read-only by construction
  *
  * Primary table (discovery-confirmed): ContainerAppConsoleLogs_CL (stdout/stderr).
- *   columns: TimeGenerated, ContainerAppName_s, Log_s, RevisionName_s, ContainerId_s, Stream_s
+ *   columns: TimeGenerated, ContainerAppName_s, Log_s, RevisionName_s, ContainerName_s, Stream_s
  * Secondary table (platform events, not yet queried here): ContainerAppSystemLogs_CL.
  */
 
 export const CONSOLE_TABLE = "ContainerAppConsoleLogs_CL";
 export const SYSTEM_TABLE = "ContainerAppSystemLogs_CL";
 
-export const ALLOWED_APPS = (process.env.ALLOWED_CONTAINER_APPS ?? "")
-  .split(",")
-  .map((s) => s.trim())
-  .filter(Boolean);
+/**
+ * Hard-coded container-app allowlist — the last line of defense against KQL
+ * injection / unauthorized table access. Intentionally NOT env-driven (which
+ * could be misconfigured); role-based authz layers on top of this.
+ */
+export const ALLOWED_APPS = ["ca-data-api", "ca-dashboard", "ca-onboarding", "ca-admin"] as const;
 
 /** Hard ceiling on rows returned by any single query. */
 export const MAX_ROWS = 500;
@@ -41,13 +43,15 @@ export interface BuildQueryInput {
   errorsOnly?: boolean;
   /** Filter to a single detected level (ignored when errorsOnly is set). */
   level?: LogLevel;
+  stream?: "stdout" | "stderr" | "all";
+  requestId?: string;
   limit?: number;
 }
 
 const ERROR_TERMS = ["ERROR", "Error", "exception", "Exception", "FATAL", "panic", "stacktrace"];
 
 export function buildLogsQuery(input: BuildQueryInput): string {
-  if (!ALLOWED_APPS.includes(input.app)) {
+  if (!(ALLOWED_APPS as readonly string[]).includes(input.app)) {
     throw new Error(`App not allowed: ${input.app}`);
   }
   const limit = Math.min(Math.max(input.limit ?? DEFAULT_ROWS, 1), MAX_ROWS);
@@ -63,6 +67,14 @@ export function buildLogsQuery(input: BuildQueryInput): string {
 
   if (input.search && input.search.trim().length > 0) {
     lines.push(`| where Log_s contains "${escapeKql(input.search)}"`);
+  }
+
+  if (input.requestId && input.requestId.trim().length > 0) {
+    lines.push(`| where Log_s contains "${escapeKql(input.requestId)}"`);
+  }
+
+  if (input.stream && input.stream !== "all") {
+    lines.push(`| where Stream_s == "${escapeKql(input.stream)}"`);
   }
 
   // Best-effort level detection from the raw line (formats vary per app - see plan section 14).

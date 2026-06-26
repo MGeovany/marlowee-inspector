@@ -114,7 +114,7 @@ function buildDataset(): LogEntry[] {
 
       out.push({
         id: `${app}-${i.toString(36)}-${pick(ids, rng)}`,
-        timeGenerated: ts,
+        timestamp: ts,
         app,
         level: tpl.level,
         message,
@@ -122,7 +122,7 @@ function buildDataset(): LogEntry[] {
         replica: `${replicaBase}-${pick(ids, rng)}`,
         stream: tpl.stream ?? "stdout",
         requestId: tpl.level === "ERROR" || rng() > 0.6 ? reqId(rng) : undefined,
-        raw: JSON.stringify(
+        rawPayload: JSON.stringify(
           {
             time: ts,
             app,
@@ -138,7 +138,7 @@ function buildDataset(): LogEntry[] {
     }
   }
 
-  return out.sort((a, b) => b.timeGenerated.localeCompare(a.timeGenerated));
+  return out.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
 }
 
 const DATASET = buildDataset();
@@ -163,7 +163,7 @@ export function queryMockLogs(q: MockQuery): LogEntry[] {
 
   return DATASET.filter((row) => {
     if (row.app !== q.app) return false;
-    if (new Date(row.timeGenerated).getTime() < cutoff) return false;
+    if (new Date(row.timestamp).getTime() < cutoff) return false;
     if (q.errorsOnly && row.level !== "ERROR") return false;
     if (!q.errorsOnly && q.level && row.level !== q.level) return false;
     if (q.stream && q.stream !== "all" && row.stream !== q.stream) return false;

@@ -65,7 +65,7 @@ export function toLogAiBrief(entry: LogEntry, masked: boolean): string {
   lines.push(`## ${intro.section}`);
   lines.push(`- App: \`${entry.app}\``);
   lines.push(`- Level: **${entry.level}**`);
-  lines.push(`- Time: ${entry.timeGenerated}`);
+  lines.push(`- Time: ${entry.timestamp}`);
   lines.push(`- Stream: \`${entry.stream}\``);
   if (entry.requestId) {
     lines.push(`- Request ID: \`${entry.requestId}\``);
@@ -101,7 +101,7 @@ export function toLogAiBrief(entry: LogEntry, masked: boolean): string {
   }
   lines.push("");
   lines.push("## Raw payload");
-  lines.push(fence(truncate(entry.raw)));
+  lines.push(fence(truncate(entry.rawPayload)));
 
   return lines.join("\n");
 }

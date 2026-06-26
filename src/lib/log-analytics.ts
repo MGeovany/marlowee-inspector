@@ -36,7 +36,7 @@ function normalizeLevel(value: string): LogLevel {
 
 /**
  * Run a read-only KQL query against the workspace and return normalized rows:
- * { id, timeGenerated, app, level, message, revision, replica, stream, raw }.
+ * { id, timestamp, app, level, stream, message, revision, replica, rawPayload }.
  */
 export async function queryLogs(kql: string, range: TimeRange): Promise<LogEntry[]> {
   const workspaceId = process.env.AZURE_LOG_ANALYTICS_WORKSPACE_ID;
@@ -66,19 +66,19 @@ export async function queryLogs(kql: string, range: TimeRange): Promise<LogEntry
   const at = (row: unknown[], i: number) => (i >= 0 ? String(row[i] ?? "") : "");
 
   return table.rows.map((row, i) => {
-    const timeGenerated = at(row, cTime);
+    const timestamp = at(row, cTime);
     const stream = at(row, cStream) === "stderr" ? "stderr" : "stdout";
     const message = at(row, cMsg);
     return {
-      id: `${at(row, cApp)}:${i}:${timeGenerated}`,
-      timeGenerated,
+      id: `${at(row, cApp)}:${i}:${timestamp}`,
+      timestamp,
       app: at(row, cApp) as ContainerApp,
       level: normalizeLevel(at(row, cLevel) || "LOG"),
       message,
       revision: at(row, cRev),
       replica: at(row, cReplica),
       stream,
-      raw: at(row, cRaw) || message,
+      rawPayload: at(row, cRaw) || message,
     } satisfies LogEntry;
   });
 }

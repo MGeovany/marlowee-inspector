@@ -12,27 +12,161 @@ export interface AppStats {
 
 export interface DashboardSummary {
   openErrors: number;
-  warnings: number;
+  activeIncidents: number;
   logsPerMin: number;
-  activeApps: number;
-  lastError: LogEntry | null;
-  queryLatencyMs: number;
+  avgResponseMs: number;
+  openErrorsDeltaPct: number | null;
+  avgResponseDeltaPct: number | null;
+  sparklines: {
+    openErrors: number[];
+    activeIncidents: number[];
+    logsPerMin: number[];
+    avgResponse: number[];
+  };
 }
 
-export interface RecentSignals {
-  latestErrors: LogEntry[];
-  spikeDetected: boolean;
-  spikeDetail: string | null;
-  noisiestApp: ContainerApp | null;
-  noisiestCount: number;
-  lastRevision: { app: ContainerApp; revision: string; time: string } | null;
-  recentWarnings: LogEntry[];
+const SPARKLINE_BUCKETS = 14;
+
+function bucketSeries(
+  rows: LogEntry[],
+  rangeMs: number,
+  bucketCount: number,
+  match?: (row: LogEntry) => boolean,
+): number[] {
+  const now = Date.now();
+  const buckets = Array.from({ length: bucketCount }, () => 0);
+
+  for (const row of rows) {
+    if (match && !match(row)) continue;
+    const age = now - new Date(row.timestamp).getTime();
+    if (age < 0 || age > rangeMs) continue;
+    const idx = Math.min(bucketCount - 1, Math.floor((1 - age / rangeMs) * bucketCount));
+    buckets[idx]++;
+  }
+
+  return buckets;
+}
+
+function deltaPct(recent: number, prior: number): number | null {
+  if (prior === 0) return recent > 0 ? 100 : null;
+  return Math.round(((recent - prior) / prior) * 100);
+}
+
+function splitWindowCounts(
+  rows: LogEntry[],
+  rangeMs: number,
+  match?: (row: LogEntry) => boolean,
+): { recent: number; prior: number } {
+  const now = Date.now();
+  const half = rangeMs / 2;
+  let recent = 0;
+  let prior = 0;
+
+  for (const row of rows) {
+    if (match && !match(row)) continue;
+    const age = now - new Date(row.timestamp).getTime();
+    if (age < 0 || age > rangeMs) continue;
+    if (age <= half) recent++;
+    else prior++;
+  }
+
+  return { recent, prior };
+}
+
+function countErrorGroups(errors: LogEntry[]): number {
+  const keys = new Set(errors.map((e) => `${e.app}:${normalizeErrorLabel(e.message)}`));
+  return keys.size;
+}
+
+function bucketActiveIncidents(rows: LogEntry[], rangeMs: number, bucketCount: number): number[] {
+  const now = Date.now();
+  const buckets: Set<string>[] = Array.from({ length: bucketCount }, () => new Set());
+
+  for (const row of rows) {
+    if (row.level !== "ERROR") continue;
+    const age = now - new Date(row.timestamp).getTime();
+    if (age < 0 || age > rangeMs) continue;
+    const idx = Math.min(bucketCount - 1, Math.floor((1 - age / rangeMs) * bucketCount));
+    buckets[idx].add(`${row.app}:${normalizeErrorLabel(row.message)}`);
+  }
+
+  return buckets.map((s) => s.size);
+}
+
+export interface DetectedError {
+  key: string;
+  label: string;
+  app: ContainerApp;
+  count: number;
+  trend: "up" | "down" | "stable";
+  sample: LogEntry;
+}
+
+export interface LatestIncident {
+  id: string;
+  severity: "SEV-2" | "SEV-3";
+  status: "INVESTIGATING" | "MONITORING" | "RESOLVED";
+  title: string;
+  app: ContainerApp;
+  sample: LogEntry;
+}
+
+export interface SidePanelData {
+  latestIncidents: LatestIncident[];
+  detectedErrors: DetectedError[];
+  recentActivity: LogEntry[];
+}
+
+function normalizeErrorLabel(message: string): string {
+  const line = message.split("\n")[0].trim();
+  if (line.length <= 56) return line;
+  return `${line.slice(0, 53)}…`;
 }
 
 export function appHealth(errors: number, warnings: number): AppHealth {
   if (errors > 0) return "error";
   if (warnings > 0) return "warning";
   return "healthy";
+}
+
+/** Group errors by message pattern and build a recent activity feed. */
+export function computeSidePanel(rows: LogEntry[]): SidePanelData {
+  const errors = rows.filter((r) => r.level === "ERROR");
+  const now = Date.now();
+  const windowMs = 30 * 60 * 1000;
+
+  const groups = new Map<string, { label: string; app: ContainerApp; entries: LogEntry[] }>();
+  for (const entry of errors) {
+    const label = normalizeErrorLabel(entry.message);
+    const key = `${entry.app}:${label}`;
+    const existing = groups.get(key);
+    if (existing) existing.entries.push(entry);
+    else groups.set(key, { label, app: entry.app, entries: [entry] });
+  }
+
+  const detectedErrors = [...groups.values()]
+    .map(({ label, app, entries }) => {
+      const recent = entries.filter((e) => now - new Date(e.timestamp).getTime() <= windowMs).length;
+      const prior = entries.filter((e) => {
+        const age = now - new Date(e.timestamp).getTime();
+        return age > windowMs && age <= windowMs * 2;
+      }).length;
+
+      let trend: DetectedError["trend"] = "stable";
+      if (recent > prior) trend = "up";
+      else if (prior > 0 && recent < prior) trend = "down";
+
+      const sample = [...entries].sort((a, b) => b.timestamp.localeCompare(a.timestamp))[0];
+      return { key: `${app}:${label}`, label, app, count: entries.length, trend, sample };
+    })
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 8);
+
+  const recentActivity = [...rows]
+    .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
+    .slice(0, 14);
+
+  return { detectedErrors, recentActivity };
 }
 
 export function computeAppStats(rows: LogEntry[], app: ContainerApp): AppStats {
@@ -52,70 +186,47 @@ export function computeSummary(
   rows: LogEntry[],
   timeRange: TimeRange,
   queryLatencyMs: number,
+  latencyHistory: number[] = [],
 ): DashboardSummary {
   const errors = rows.filter((r) => r.level === "ERROR");
-  const warnings = rows.filter((r) => r.level === "WARN");
   const rangeMs = TIME_RANGE_MS[timeRange];
   const logsPerMin = rangeMs > 0 ? Math.round((rows.length / rangeMs) * 60_000) : 0;
-  const activeApps = new Set(rows.map((r) => r.app)).size;
-  const lastError = errors.sort((a, b) => b.timeGenerated.localeCompare(a.timeGenerated))[0] ?? null;
+
+  const errorSplit = splitWindowCounts(rows, rangeMs, (r) => r.level === "ERROR");
+  const openErrorsDeltaPct = deltaPct(errorSplit.recent, errorSplit.prior);
+
+  const latencySeries =
+    latencyHistory.length > 0 ? latencyHistory : [queryLatencyMs];
+  const avgResponseMs = Math.round(
+    latencySeries.reduce((a, b) => a + b, 0) / latencySeries.length,
+  );
+  const mid = Math.floor(latencySeries.length / 2);
+  const recentLat = latencySeries.slice(mid);
+  const priorLat = latencySeries.slice(0, mid);
+  const recentAvg =
+    recentLat.length > 0 ? recentLat.reduce((a, b) => a + b, 0) / recentLat.length : 0;
+  const priorAvg =
+    priorLat.length > 0 ? priorLat.reduce((a, b) => a + b, 0) / priorLat.length : 0;
+  const avgResponseDeltaPct = deltaPct(recentAvg, priorAvg);
 
   return {
     openErrors: errors.length,
-    warnings: warnings.length,
+    activeIncidents: countErrorGroups(errors),
     logsPerMin,
-    activeApps,
-    lastError,
-    queryLatencyMs,
-  };
-}
-
-export function computeSignals(rows: LogEntry[], timeRange: TimeRange): RecentSignals {
-  const sorted = [...rows].sort((a, b) => b.timeGenerated.localeCompare(a.timeGenerated));
-  const errors = sorted.filter((r) => r.level === "ERROR");
-  const warnings = sorted.filter((r) => r.level === "WARN");
-
-  const now = Date.now();
-  const windowMs = 15 * 60 * 1000;
-  const recent = sorted.filter((r) => now - new Date(r.timeGenerated).getTime() <= windowMs);
-  const prior = sorted.filter((r) => {
-    const age = now - new Date(r.timeGenerated).getTime();
-    return age > windowMs && age <= windowMs * 2;
-  });
-  const spikeDetected = prior.length > 0 && recent.length >= prior.length * 2 && recent.length >= 8;
-  const spikeDetail = spikeDetected
-    ? `${recent.length} logs in last 15m vs ${prior.length} in prior 15m`
-    : null;
-
-  const counts = new Map<ContainerApp, number>();
-  for (const r of rows) counts.set(r.app, (counts.get(r.app) ?? 0) + 1);
-  let noisiestApp: ContainerApp | null = null;
-  let noisiestCount = 0;
-  for (const [app, count] of counts) {
-    if (count > noisiestCount) {
-      noisiestApp = app;
-      noisiestCount = count;
-    }
-  }
-
-  const latest = sorted[0];
-  const lastRevision = latest
-    ? { app: latest.app, revision: latest.revision, time: latest.timeGenerated }
-    : null;
-
-  return {
-    latestErrors: errors.slice(0, 5),
-    spikeDetected,
-    spikeDetail,
-    noisiestApp,
-    noisiestCount,
-    lastRevision,
-    recentWarnings: warnings.slice(0, 5),
+    avgResponseMs,
+    openErrorsDeltaPct,
+    avgResponseDeltaPct,
+    sparklines: {
+      openErrors: bucketSeries(rows, rangeMs, SPARKLINE_BUCKETS, (r) => r.level === "ERROR"),
+      activeIncidents: bucketActiveIncidents(rows, rangeMs, SPARKLINE_BUCKETS),
+      logsPerMin: bucketSeries(rows, rangeMs, SPARKLINE_BUCKETS),
+      avgResponse: latencySeries.slice(-SPARKLINE_BUCKETS),
+    },
   };
 }
 
 export function relatedLogs(entry: LogEntry, allRows: LogEntry[], limit = 8): LogEntry[] {
-  const entryTime = new Date(entry.timeGenerated).getTime();
+  const entryTime = new Date(entry.timestamp).getTime();
   const windowMs = 5 * 60 * 1000;
 
   return allRows
@@ -123,35 +234,34 @@ export function relatedLogs(entry: LogEntry, allRows: LogEntry[], limit = 8): Lo
       if (r.id === entry.id) return false;
       if (r.app !== entry.app) return false;
       if (entry.requestId && r.requestId === entry.requestId) return true;
-      return Math.abs(new Date(r.timeGenerated).getTime() - entryTime) <= windowMs;
+      return Math.abs(new Date(r.timestamp).getTime() - entryTime) <= windowMs;
     })
-    .sort((a, b) => b.timeGenerated.localeCompare(a.timeGenerated))
+    .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
     .slice(0, limit);
 }
 
 export function filterLogRows(
   rows: LogEntry[],
   opts: {
-    app: ContainerApp | null;
+    app: ContainerApp | "all";
     search: string;
     level: LogEntry["level"] | "ALL";
     stream: "stdout" | "stderr" | "all";
     errorsOnly: boolean;
-    requestId: string;
   },
 ): LogEntry[] {
   const search = opts.search.trim().toLowerCase();
-  const reqId = opts.requestId.trim().toLowerCase();
 
   return rows.filter((row) => {
-    if (opts.app && row.app !== opts.app) return false;
+    if (opts.app !== "all" && row.app !== opts.app) return false;
     if (opts.errorsOnly && row.level !== "ERROR") return false;
     if (!opts.errorsOnly && opts.level !== "ALL" && row.level !== opts.level) return false;
     if (opts.stream !== "all" && row.stream !== opts.stream) return false;
-    if (search && !row.message.toLowerCase().includes(search)) return false;
-    if (reqId) {
-      const rid = row.requestId?.toLowerCase() ?? "";
-      if (!rid.includes(reqId) && !row.message.toLowerCase().includes(reqId)) return false;
+    if (search) {
+      const haystack = [row.message, row.revision, row.replica, row.requestId ?? ""]
+        .join(" ")
+        .toLowerCase();
+      if (!haystack.includes(search)) return false;
     }
     return true;
   });
