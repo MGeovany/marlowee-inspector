@@ -1,6 +1,8 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   Archive,
   EyeOff,
@@ -24,49 +26,59 @@ import brandIcon from "@/app/icon.png";
 
 export type AppSelection = ContainerApp | "all";
 
+type NavItemDef = {
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  href: string;
+  adminOnly?: boolean;
+  disabled?: boolean;
+};
+
+const NAV_SECTIONS: { title: string; items: NavItemDef[] }[] = [
+  {
+    title: "Monitor",
+    items: [
+      { label: "Overview", icon: Layers, href: "/overview" },
+      { label: "Live Logs", icon: Radio, href: "/logs" },
+      { label: "Test Sessions", icon: ListChecks, href: "/logs", disabled: true },
+      { label: "Search", icon: Search, href: "/logs", disabled: true },
+    ],
+  },
+  {
+    title: "Triage",
+    items: [
+      { label: "Issues", icon: FileSearch, href: "/logs", disabled: true },
+      { label: "Resolved", icon: Archive, href: "/logs", disabled: true },
+      { label: "Hidden / Suppressed", icon: EyeOff, href: "/logs", disabled: true },
+      { label: "Notes", icon: MessageSquareText, href: "/logs", disabled: true },
+    ],
+  },
+  {
+    title: "Sources",
+    items: [
+      { label: "Container Apps", icon: Server, href: "/logs", disabled: true },
+      { label: "System Logs", icon: ScrollText, href: "/logs", disabled: true },
+    ],
+  },
+  {
+    title: "Settings",
+    items: [
+      { label: "Access", icon: KeyRound, href: "/logs", disabled: true, adminOnly: true },
+      { label: "Masking Rules", icon: ShieldCheck, href: "/logs", disabled: true, adminOnly: true },
+      { label: "Audit Log", icon: FileText, href: "/audit", adminOnly: true },
+    ],
+  },
+];
+
 interface LogsSidebarProps {
   userEmail: string | null;
   role: string | null;
   signOutAction: () => Promise<void>;
 }
 
-const NAV_SECTIONS = [
-  {
-    title: "Monitor",
-    items: [
-      { label: "Overview", icon: Layers, active: false },
-      { label: "Live Logs", icon: Radio, active: true },
-      { label: "Test Sessions", icon: ListChecks, active: false },
-      { label: "Search", icon: Search, active: false },
-    ],
-  },
-  {
-    title: "Triage",
-    items: [
-      { label: "Issues", icon: FileSearch, active: false },
-      { label: "Resolved", icon: Archive, active: false },
-      { label: "Hidden / Suppressed", icon: EyeOff, active: false },
-      { label: "Notes", icon: MessageSquareText, active: false },
-    ],
-  },
-  {
-    title: "Sources",
-    items: [
-      { label: "Container Apps", icon: Server, active: false },
-      { label: "System Logs", icon: ScrollText, active: false },
-    ],
-  },
-  {
-    title: "Settings",
-    items: [
-      { label: "Access", icon: KeyRound, active: false },
-      { label: "Masking Rules", icon: ShieldCheck, active: false },
-      { label: "Audit Log", icon: FileText, active: false },
-    ],
-  },
-];
-
 export function LogsSidebar({ userEmail, role, signOutAction }: LogsSidebarProps) {
+  const pathname = usePathname();
+  const isAdmin = role === "Admin";
   const initials = userInitials(userEmail);
 
   return (
@@ -86,18 +98,23 @@ export function LogsSidebar({ userEmail, role, signOutAction }: LogsSidebarProps
       </div>
 
       <nav aria-label="Main sections" className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
-        {NAV_SECTIONS.map((section) => (
-          <div key={section.title} className="mb-4">
-            <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-fg-subtle">
-              {section.title}
-            </p>
-            <div className="space-y-0.5">
-              {section.items.map((item) => (
-                <NavItem key={item.label} icon={item.icon} label={item.label} active={item.active} />
-              ))}
+        {NAV_SECTIONS.map((section) => {
+          const items = section.items.filter((item) => !item.adminOnly || isAdmin);
+          if (items.length === 0) return null;
+
+          return (
+            <div key={section.title} className="mb-4">
+              <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-fg-subtle">
+                {section.title}
+              </p>
+              <div className="space-y-0.5">
+                {items.map((item) => (
+                  <NavItem key={item.label} item={item} pathname={pathname} />
+                ))}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </nav>
 
       <div className="border-t border-border p-3">
@@ -129,18 +146,27 @@ export function LogsSidebar({ userEmail, role, signOutAction }: LogsSidebarProps
   );
 }
 
-function NavItem({
-  icon: Icon,
-  label,
-  active,
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  active?: boolean;
-}) {
+function NavItem({ item, pathname }: { item: NavItemDef; pathname: string }) {
+  const Icon = item.icon;
+  const active = isNavActive(pathname, item.href, item.label);
+
+  if (item.disabled) {
+    return (
+      <span
+        className="sidebar-nav-item cursor-not-allowed text-fg-subtle opacity-45"
+        title="Coming soon"
+      >
+        <span className="sidebar-nav-icon sidebar-nav-icon-idle">
+          <Icon className="h-3.5 w-3.5" />
+        </span>
+        <span className="flex-1 text-[13px] font-medium leading-none">{item.label}</span>
+      </span>
+    );
+  }
+
   return (
-    <button
-      type="button"
+    <Link
+      href={item.href}
       aria-current={active ? "page" : undefined}
       className={cn("sidebar-nav-item", active && "sidebar-nav-item-active", !active && "text-fg-muted")}
     >
@@ -153,10 +179,15 @@ function NavItem({
         <Icon className="h-3.5 w-3.5" />
       </span>
       <span className={cn("flex-1 text-[13px] leading-none", active ? "font-semibold text-fg" : "font-medium")}>
-        {label}
+        {item.label}
       </span>
-    </button>
+    </Link>
   );
+}
+
+function isNavActive(pathname: string, href: string, label: string): boolean {
+  if (label === "Live Logs") return pathname === "/logs";
+  return pathname === href || pathname.startsWith(`${href}/`);
 }
 
 function userInitials(email: string | null): string {
