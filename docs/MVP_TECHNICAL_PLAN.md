@@ -1,4 +1,4 @@
-# SavLogs — MVP Technical Plan
+# Marlowee Inspector — MVP Technical Plan
 
 Internal web app (Next.js) to query application logs from the Azure Log Analytics
 workspace **`law-savvly-dev-main`**, for the container apps:
@@ -63,7 +63,7 @@ Browser (employee)
 
 - **One Next.js app** (App Router). Frontend and backend in the same deployable; all Azure
   access happens **only** in server code (Route Handlers / Server Actions).
-- **The user never touches Azure.** SavLogs queries logs with its **own Managed Identity**.
+- **The user never touches Azure.** Marlowee Inspector queries logs with its **own Managed Identity**.
   Authorization (who can see what) is enforced in the backend by **App Role**, not by Azure RBAC
   on the user.
 - **Deploy target:** a new Container App in the existing `aca-env-savvly-dev-main` environment
@@ -91,10 +91,10 @@ Browser (employee)
 Library: **Auth.js v5 (`next-auth@beta`)** with the **Microsoft Entra ID** provider.
 
 ```
-1. User hits SavLogs → no session → redirect to /api/auth/signin
+1. User hits Marlowee Inspector → no session → redirect to /api/auth/signin
 2. Redirect to Entra ID authorize endpoint (tenant cac58ef5…)
 3. User authenticates with their @savvly.com account (MFA per tenant policy)
-4. Entra returns id_token + access_token to the SavLogs callback
+4. Entra returns id_token + access_token to the Marlowee Inspector callback
 5. Auth.js validates the token, creates an encrypted session cookie
 6. The `roles` claim (App Roles) is copied into the session via the jwt callback
 7. Subsequent requests carry the httpOnly session cookie; the backend reads roles from it
@@ -103,7 +103,7 @@ Library: **Auth.js v5 (`next-auth@beta`)** with the **Microsoft Entra ID** provi
 **App Registration (to be created later — NOT in this repo):**
 
 - Single tenant (`cac58ef5-e1ea-4641-9663-a6d848ad392f`).
-- Redirect URI: `https://<savlogs-host>/api/auth/callback/microsoft-entra-id`
+- Redirect URI: `https://<marlowee-inspector-host>/api/auth/callback/microsoft-entra-id`
   (and `http://localhost:3000/api/auth/callback/microsoft-entra-id` for dev).
 - **App Roles** defined on the app: `Admin`, `Developer`, `QA`, `Support`, `Viewer`.
 - Assign roles via Enterprise Application → Users and groups (prefer Entra **groups**).
@@ -111,7 +111,7 @@ Library: **Auth.js v5 (`next-auth@beta`)** with the **Microsoft Entra ID** provi
 
 **Why Auth.js over raw MSAL for the MVP:** less boilerplate, encrypted cookie sessions out of the
 box, first-class App Router support. MSAL Node remains a valid alternative if you later need
-on-behalf-of flows; not needed here because SavLogs uses its **own** identity to read logs.
+on-behalf-of flows; not needed here because Marlowee Inspector uses its **own** identity to read logs.
 
 ---
 
@@ -171,7 +171,7 @@ const result = await client.queryWorkspace(
 );
 ```
 
-**Minimum permission to grant later (NOT in this repo):** the SavLogs managed identity needs
+**Minimum permission to grant later (NOT in this repo):** the Marlowee Inspector managed identity needs
 **`Log Analytics Reader`** scoped **only** to `law-savvly-dev-main` — never subscription-wide,
 never `Contributor`.
 
@@ -199,7 +199,7 @@ Time range is an enum (`1h | 24h | 7d`) mapped to SDK `Durations`, never a raw u
 
 ```
 ┌───────────────────────────────────────────────────────────────┐
-│  SAVLOGS                                  ▢ marlon@savvly.com ▾ │   ← topbar (pixel wordmark)
+│  MARLOWEE INSPECTOR                       ▢ marlon@savvly.com ▾ │   ← topbar (pixel wordmark)
 ├───────────────┬───────────────────────────────────────────────┤
 │  App          │  [ Search… ]  [ 1h | 24h | 7d ]  [ Errors only]│   ← filter bar
 │  ◉ ca-data-api│ ───────────────────────────────────────────────│
@@ -244,7 +244,7 @@ Time range is an enum (`1h | 24h | 7d`) mapped to SDK `Durations`, never a raw u
 - Every search emits a structured event: `actor` (UPN + oid), `role`, `app`, `timeRange`,
   `query` (escaped text), `errorsOnly`, `rawMode`, `rowCount`, `timestamp`, `requestId`.
 - MVP sink: structured JSON to **stdout** (captured by Container Apps → `ContainerAppConsoleLogs_CL`
-  under the `ca-savlogs` app). Upgrade path: dedicated table (Postgres/Supabase) for tamper-evident
+  under the `ca-marlowee-inspector` app). Upgrade path: dedicated table (Postgres/Supabase) for tamper-evident
   retention.
 
 ### Rate limiting
@@ -304,7 +304,7 @@ durable audit.
 
 ## 14. Technical risks of the MVP
 
-1. **30-day retention.** Anything older is gone; not a SavLogs bug. Surface it in the UI; consider
+1. **30-day retention.** Anything older is gone; not a Marlowee Inspector bug. Surface it in the UI; consider
    archival/export later if support needs more history.
 2. **No structured requests/exceptions.** Only console/system logs exist in this workspace.
    "Failed requests" / "exceptions" views depend on parsing free-text `Log_s` and will be
@@ -323,7 +323,7 @@ durable audit.
 8. **App Roles claim setup.** If App Roles aren't assigned (or the token is misconfigured), the
    `roles` claim is empty and everyone is denied. Verify the claim end-to-end early.
 9. **Audit-to-same-workspace circularity.** MVP writes audit to stdout that lands in the same
-   workspace SavLogs reads. Acceptable for MVP, but a tamper-resistant separate store is better.
+   workspace Marlowee Inspector reads. Acceptable for MVP, but a tamper-resistant separate store is better.
 
 ---
 

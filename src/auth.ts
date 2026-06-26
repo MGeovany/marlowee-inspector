@@ -4,11 +4,14 @@ import MicrosoftEntraID from "next-auth/providers/microsoft-entra-id";
 /**
  * Auth.js v5 configuration for Microsoft Entra ID (OIDC).
  *
- * App Roles assigned in the "SavLogs" App Registration arrive in the token `roles`
+ * App Roles assigned in the "Marlowee Inspector" App Registration arrive in the token `roles`
  * claim. We copy that claim into the JWT and expose it on the session so the
  * backend can authorize by role. No Azure credentials ever reach the client.
  */
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  pages: {
+    signIn: "/login",
+  },
   providers: [
     MicrosoftEntraID({
       clientId: process.env.AUTH_MICROSOFT_ENTRA_ID_ID,

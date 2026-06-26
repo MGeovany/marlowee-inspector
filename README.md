@@ -1,4 +1,4 @@
-# SavLogs
+# Marlowee Inspector
 
 Internal web app to read application logs from Azure **Log Analytics** (`law-savvly-dev-main`)
 for the Savvly container apps: `ca-data-api`, `ca-dashboard`, `ca-onboarding`, `ca-admin`.

@@ -1,8 +1,8 @@
 {
-  "name": "savlogs",
+  "name": "marlowee-inspector",
   "version": "0.1.0",
   "private": true,
-  "description": "Internal web app to read Azure Log Analytics logs for Savvly container apps",
+  "description": "Internal log inspector for Savvly container apps (Marlowee Inspector)",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

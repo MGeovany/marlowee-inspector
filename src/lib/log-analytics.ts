@@ -30,6 +30,7 @@ export interface LogRow {
   app: string;
   level: string;
   message: string;
+  [k: string]: unknown;
 }
 
 /** Run a read-only KQL query against law-savvly-dev-main and return typed rows. */

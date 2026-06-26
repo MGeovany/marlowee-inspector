@@ -1,0 +1,23 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --surface: 220 14% 6%;
+    --surface-elevated: 220 12% 10%;
+    --surface-border: 220 10% 18%;
+    --ink: 210 20% 98%;
+    --ink-muted: 215 12% 65%;
+    --ink-faint: 215 10% 45%;
+    --glow: 199 89% 48%;
+  }
+
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-surface text-ink antialiased;
+  }
+}
