@@ -14,7 +14,7 @@ import {
 } from "@/lib/types";
 import type { AppSelection } from "./logs-sidebar";
 
-export type LogStream = "stdout" | "stderr" | "all";
+export type LogStream = "stdout" | "stderr" | "all" | "system";
 
 interface LogFiltersProps {
   search: string;
@@ -24,12 +24,13 @@ interface LogFiltersProps {
   onAppChange: (app: AppSelection) => void;
   level: LogLevel | "ALL";
   onLevelChange: (v: LogLevel | "ALL") => void;
-  stream: LogStream;
+  stream: "stdout" | "stderr" | "all" | "system";
   onStreamChange: (v: LogStream) => void;
   timeRange: TimeRange;
   onTimeRangeChange: (v: TimeRange) => void;
   maxRange: TimeRange;
   sessionMode?: boolean;
+  hideStream?: boolean;
 }
 
 const LEVEL_CHIP: Record<LogLevel, string> = {
@@ -54,6 +55,7 @@ export function LogFilters({
   onTimeRangeChange,
   maxRange,
   sessionMode = false,
+  hideStream = false,
 }: LogFiltersProps) {
   const maxIdx = TIME_RANGES.indexOf(maxRange);
 
@@ -118,18 +120,24 @@ export function LogFilters({
 
       <div className="hidden h-5 w-px bg-border lg:block" />
 
-      <div className="hidden lg:block">
-        <SegmentControl
-          value={stream}
-          onValueChange={onStreamChange}
-          mono
-          options={[
-            { value: "all", label: "all" },
-            { value: "stdout", label: "stdout" },
-            { value: "stderr", label: "stderr" },
-          ]}
-        />
-      </div>
+      {hideStream ? (
+        <div className="filter-segment filter-segment-filled hidden lg:block">
+          <span className="segment-option-static segment-option-mono">system</span>
+        </div>
+      ) : (
+        <div className="hidden lg:block">
+          <SegmentControl
+            value={stream === "system" ? "all" : stream}
+            onValueChange={onStreamChange}
+            mono
+            options={[
+              { value: "all", label: "all" },
+              { value: "stdout", label: "stdout" },
+              { value: "stderr", label: "stderr" },
+            ]}
+          />
+        </div>
+      )}
     </div>
   );
 }

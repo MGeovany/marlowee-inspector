@@ -199,7 +199,7 @@ Hoy `LogsSidebar` renderiza 13 ítems estáticos; solo **Live Logs** tiene conte
 
 ### Monitor
 
-- [ ] **6.1** Vista **Overview**
+- [x] **6.1** Vista **Overview**
   - **Contenido:** KPI cards, sparklines por app, top error patterns, banner workspace `law-savvly-dev-main`.
   - **APIs:** `/api/logs/summary`, `/api/logs/metrics`.
 
@@ -211,10 +211,6 @@ Hoy `LogsSidebar` renderiza 13 ítems estáticos; solo **Live Logs** tiene conte
   - **Contenido:** CRUD sessions, historial, resume → Live Logs.
   - **APIs:** `/api/sessions`.
 
-- [ ] **6.4** Vista **Search**
-  - **Contenido:** Búsqueda avanzada, preview KQL, resultados en tabla.
-  - **APIs:** `/api/logs`.
-
 ### Triage
 
 - [x] **6.5** Vista **Issues** — cola open/investigating; acciones resolve/suppress.
@@ -224,8 +220,8 @@ Hoy `LogsSidebar` renderiza 13 ítems estáticos; solo **Live Logs** tiene conte
 
 ### Sources
 
-- [ ] **6.9** Vista **Container Apps** — catálogo + permisos por rol (`authz.ts`).
-- [ ] **6.10** Vista **System Logs** — `ContainerAppSystemLogs_CL`, `stream=system` fijo.
+- [x] **6.9** Vista **Container Apps** — catálogo + permisos por rol (`authz.ts`).
+- [x] **6.10** Vista **System Logs** — `ContainerAppSystemLogs_CL`, `stream=system` fijo.
 
 ### Settings
 
@@ -235,21 +231,21 @@ Hoy `LogsSidebar` renderiza 13 ítems estáticos; solo **Live Logs** tiene conte
 
 ### Resumen de vistas
 
-| # | Sidebar | Vista | Estado |
-|---|---------|-------|--------|
-| 6.1 | Overview | Dashboard KPIs | [ ] |
-| 6.2 | Live Logs | Stream + detail | [x] parcial |
-| 6.3 | Test Sessions | CRUD sessions | [x] |
-| 6.4 | Search | Búsqueda + KQL | [ ] |
-| 6.5 | Issues | Cola triage | [x] |
-| 6.6 | Resolved | Issues cerrados | [x] |
-| 6.7 | Hidden / Suppressed | Tabs ocultos | [x] |
-| 6.8 | Notes | Feed anotaciones | [x] |
-| 6.9 | Container Apps | Catálogo apps | [ ] |
-| 6.10 | System Logs | System logs ACA | [ ] |
-| 6.11 | Access | Permisos | [ ] |
-| 6.12 | Masking Rules | Reglas redacción | [ ] |
-| 6.13 | Audit Log | Eventos audit | [ ] |
+| #    | Sidebar             | Vista            | Estado      |
+| ---- | ------------------- | ---------------- | ----------- |
+| 6.1  | Overview            | Dashboard KPIs   | [ ]         |
+| 6.2  | Live Logs           | Stream + detail  | [x] parcial |
+| 6.3  | Test Sessions       | CRUD sessions    | [x]         |
+| 6.4  | Search              | Búsqueda + KQL   | [ ]         |
+| 6.5  | Issues              | Cola triage      | [x]         |
+| 6.6  | Resolved            | Issues cerrados  | [x]         |
+| 6.7  | Hidden / Suppressed | Tabs ocultos     | [x]         |
+| 6.8  | Notes               | Feed anotaciones | [x]         |
+| 6.9  | Container Apps      | Catálogo apps    | [x]         |
+| 6.10 | System Logs         | System logs ACA  | [x]         |
+| 6.11 | Access              | Permisos         | [ ]         |
+| 6.12 | Masking Rules       | Reglas redacción | [ ]         |
+| 6.13 | Audit Log           | Eventos audit    | [ ]         |
 
 ---
 

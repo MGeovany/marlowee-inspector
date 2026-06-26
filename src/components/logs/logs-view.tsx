@@ -67,6 +67,7 @@ interface LogsViewProps {
   maxRange: TimeRange;
   signOutAction: () => Promise<void>;
   initialSessionId?: string;
+  initialApp?: ContainerApp;
 }
 
 const LIVE_INTERVAL_MS = 15_000;
@@ -88,8 +89,12 @@ export function LogsView({
   maxRange,
   signOutAction,
   initialSessionId,
+  initialApp,
 }: LogsViewProps) {
-  const [selectedApp, setSelectedApp] = useState<AppSelection>("all");
+  const [selectedApp, setSelectedApp] = useState<AppSelection>(() => {
+    if (initialApp && allowedApps.includes(initialApp)) return initialApp;
+    return "all";
+  });
   const [search, setSearch] = useState("");
   const [level, setLevel] = useState<LogLevel | "ALL">("ALL");
   const [stream, setStream] = useState<LogStream>("all");

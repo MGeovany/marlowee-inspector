@@ -41,7 +41,7 @@ export function filterLogRows(
     app: LogEntry["app"] | "all";
     search: string;
     level: LogEntry["level"] | "ALL";
-    stream: "stdout" | "stderr" | "all";
+    stream: "stdout" | "stderr" | "all" | "system";
   },
 ): LogEntry[] {
   const query = parseSearchQuery(opts.search);

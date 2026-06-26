@@ -54,8 +54,8 @@ const NAV_SECTIONS: { title: string; items: NavItemDef[] }[] = [
   {
     title: "Sources",
     items: [
-      { label: "Container Apps", icon: Server, href: "/logs", disabled: true },
-      { label: "System Logs", icon: ScrollText, href: "/logs", disabled: true },
+      { label: "Container Apps", icon: Server, href: "/apps" },
+      { label: "System Logs", icon: ScrollText, href: "/system-logs" },
     ],
   },
   {
@@ -190,6 +190,8 @@ function isNavActive(pathname: string, href: string, label: string): boolean {
   if (label === "Resolved") return pathname === "/resolved";
   if (label === "Hidden / Suppressed") return pathname === "/hidden";
   if (label === "Notes") return pathname === "/notes";
+  if (label === "Container Apps") return pathname === "/apps";
+  if (label === "System Logs") return pathname === "/system-logs";
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
