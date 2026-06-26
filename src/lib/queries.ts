@@ -199,7 +199,7 @@ export function buildLogsSummaryQuery(input: BuildSummaryQueryInput): string {
       'Message has_any ("WARN","WARNING"), "WARN", ' +
       'Message has "INFO", "INFO", ' +
       '"LOG"))',
-    ";",
+    ");",
     "union",
     `  (Base | summarize TotalLogs = count(), ErrorsCount = countif(Level == "ERROR"), WarningsCount = countif(Level == "WARN"), LastLogTimestamp = max(TimeGenerated) | project Kind = "totals", Key = "", ${nullMetrics.replace("TotalLogs = long(null), ErrorsCount = long(null), WarningsCount = long(null), LastLogTimestamp = datetime(null)", "TotalLogs, ErrorsCount, WarningsCount, LastLogTimestamp")}, ${nullLogFields}),`,
     `  (Base | summarize Count = countif(Level == "ERROR") by App | project Kind = "errorsByApp", Key = App, Count, TotalLogs = long(null), ErrorsCount = long(null), WarningsCount = long(null), LastLogTimestamp = datetime(null), App = "", Level = "", TimeGenerated = datetime(null), Message = "", Revision = "", Replica = "", Stream = ""),`,
