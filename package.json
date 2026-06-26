@@ -4,9 +4,9 @@
   "private": true,
   "description": "Internal log inspector for Savvly container apps (Marlowee Inspector)",
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 4444",
     "build": "next build",
-    "start": "next start",
+    "start": "next start -p 4444",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-strip-types --test src/**/*.test.ts",
