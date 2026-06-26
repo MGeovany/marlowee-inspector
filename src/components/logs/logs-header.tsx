@@ -6,6 +6,7 @@ import { Pause, Play, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import type { TestSession } from "@/lib/test-session";
 
 interface LogsHeaderProps {
   lastRefresh: Date | null;
@@ -15,6 +16,7 @@ interface LogsHeaderProps {
   loading: boolean;
   source: "mock" | "azure";
   masked: boolean;
+  testSession?: TestSession | null;
 }
 
 export function LogsHeader({
@@ -25,6 +27,7 @@ export function LogsHeader({
   loading,
   source,
   masked,
+  testSession,
 }: LogsHeaderProps) {
   return (
     <header className="shrink-0 border-b border-border bg-sidebar px-4 py-2.5">
@@ -39,6 +42,11 @@ export function LogsHeader({
         </div>
 
         <div className="flex items-center gap-2">
+          {testSession && (
+            <Badge variant={testSession.status === "active" ? "default" : "neutral"}>
+              Session · {testSession.status === "active" ? "live" : "stopped"}
+            </Badge>
+          )}
           {source === "mock" && <Badge variant="warn">mock</Badge>}
           {masked && <Badge variant="neutral">masked</Badge>}
           <Button

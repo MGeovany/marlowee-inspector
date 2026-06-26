@@ -17,6 +17,12 @@ import {
   type TimeRange,
   TIME_RANGES,
 } from "@/lib/types";
+import {
+  loadTestSession,
+  saveTestSession,
+  sessionTimeWindow,
+  type TestSession,
+} from "@/lib/test-session";
 import { LogDetailPanel } from "./log-detail-panel";
 import { LogFilters, type LogStream } from "./log-filters";
 import { LogsHeader } from "./logs-header";
@@ -24,6 +30,7 @@ import { LogsSidebar, type AppSelection } from "./logs-sidebar";
 import { LogsSummaryCards } from "./logs-summary-cards";
 import { LogsTable, type LogsStatus } from "./logs-table";
 import { RecentSignalsPanel } from "./recent-signals-panel";
+import { TestSessionBar } from "./test-session-bar";
 
 interface LogsViewProps {
   allowedApps: ContainerApp[];
@@ -38,6 +45,12 @@ const LIVE_INTERVAL_MS = 15_000;
 
 function clampRange(desired: TimeRange, max: TimeRange): TimeRange {
   return TIME_RANGES.indexOf(desired) > TIME_RANGES.indexOf(max) ? max : desired;
+}
+
+function appendTimeWindow(params: URLSearchParams, session: TestSession | null) {
+  const window = sessionTimeWindow(session);
+  if (window.since) params.set("since", window.since);
+  if (window.until) params.set("until", window.until);
 }
 
 export function LogsView({
@@ -57,6 +70,10 @@ export function LogsView({
   const [raw, setRaw] = useState(false);
   const [live, setLive] = useState(true);
 
+  const [testSession, setTestSession] = useState<TestSession | null>(null);
+  const [requestIdFilter, setRequestIdFilter] = useState("");
+  const [testSessionIdFilter, setTestSessionIdFilter] = useState("");
+
   const [status, setStatus] = useState<LogsStatus>("idle");
   const [allRows, setAllRows] = useState<LogEntry[]>([]);
   const [masked, setMasked] = useState(true);
@@ -69,6 +86,12 @@ export function LogsView({
 
   const [detailEntry, setDetailEntry] = useState<LogEntry | null>(null);
 
+  useEffect(() => {
+    setTestSession(loadTestSession());
+  }, []);
+
+  const sessionActive = testSession?.status === "active";
+
   const fetchSummary = useCallback(async () => {
     if (allowedApps.length === 0) return;
     setSummaryLoading(true);
@@ -76,6 +99,7 @@ export function LogsView({
     try {
       const params = new URLSearchParams({ timeRange });
       if (selectedApp !== "all") params.set("app", selectedApp);
+      appendTimeWindow(params, testSession);
 
       const res = await fetch(`/api/logs/summary?${params.toString()}`);
       if (!res.ok) {
@@ -88,7 +112,7 @@ export function LogsView({
     } finally {
       setSummaryLoading(false);
     }
-  }, [allowedApps, selectedApp, timeRange]);
+  }, [allowedApps, selectedApp, testSession, timeRange]);
 
   const fetchLogs = useCallback(async () => {
     if (allowedApps.length === 0) return;
@@ -107,6 +131,9 @@ export function LogsView({
           });
           if (search.trim()) params.set("search", search.trim());
           if (level !== "ALL") params.set("level", level);
+          if (requestIdFilter.trim()) params.set("requestId", requestIdFilter.trim());
+          if (testSessionIdFilter.trim()) params.set("testSessionId", testSessionIdFilter.trim());
+          appendTimeWindow(params, testSession);
 
           const res = await fetch(`/api/logs?${params.toString()}`);
           if (!res.ok) {
@@ -130,7 +157,18 @@ export function LogsView({
       setError(e instanceof Error ? e.message : "unknown error");
       setStatus("error");
     }
-  }, [allowedApps, timeRange, stream, raw, errorsOnly, level, search]);
+  }, [
+    allowedApps,
+    timeRange,
+    stream,
+    raw,
+    errorsOnly,
+    level,
+    search,
+    testSession,
+    requestIdFilter,
+    testSessionIdFilter,
+  ]);
 
   useEffect(() => {
     const t = setTimeout(() => void fetchLogs(), 250);
@@ -143,10 +181,10 @@ export function LogsView({
   }, [fetchSummary, nonce]);
 
   useEffect(() => {
-    if (!live) return;
+    if (!live || !sessionActive) return;
     const id = window.setInterval(() => setNonce((n) => n + 1), LIVE_INTERVAL_MS);
     return () => window.clearInterval(id);
-  }, [live]);
+  }, [live, sessionActive]);
 
   const tableRows = useMemo(
     () =>
@@ -171,6 +209,22 @@ export function LogsView({
     () => (detailEntry ? relatedLogs(detailEntry, allRows) : []),
     [detailEntry, allRows],
   );
+
+  function handleSessionChange(session: TestSession | null) {
+    setTestSession(session);
+    saveTestSession(session);
+    setAllRows([]);
+    setDetailEntry(null);
+    if (session?.status === "active") setLive(true);
+    if (session?.status === "stopped") setLive(false);
+    setNonce((n) => n + 1);
+  }
+
+  function handleClearView() {
+    setAllRows([]);
+    setDetailEntry(null);
+    setNonce((n) => n + 1);
+  }
 
   if (allowedApps.length === 0) {
     return (
@@ -203,18 +257,31 @@ export function LogsView({
       <div className="flex min-w-0 flex-1 flex-col">
         <LogsHeader
           lastRefresh={lastRefresh}
-          live={live}
+          live={live && sessionActive}
           onLiveToggle={() => setLive((v) => !v)}
           onRefresh={() => setNonce((n) => n + 1)}
           loading={status === "loading"}
           source={source}
           masked={masked}
+          testSession={testSession}
+        />
+
+        <TestSessionBar
+          session={testSession}
+          onSessionChange={handleSessionChange}
+          onClearView={handleClearView}
+          logCount={tableRows.length}
+          requestIdFilter={requestIdFilter}
+          onRequestIdFilterChange={setRequestIdFilter}
+          testSessionIdFilter={testSessionIdFilter}
+          onTestSessionIdFilterChange={setTestSessionIdFilter}
         />
 
         <LogsSummaryCards
           summary={summary}
           loading={status === "loading" || summaryLoading}
-          live={live}
+          live={live && sessionActive}
+          sessionActive={Boolean(testSession)}
         />
 
         <div className="relative flex min-h-0 flex-1 overflow-hidden">
@@ -234,6 +301,7 @@ export function LogsView({
               raw={raw}
               onRawChange={setRaw}
               canSeeRaw={canSeeRaw}
+              sessionMode={Boolean(testSession)}
             />
 
             <div className="min-h-0 flex-1 bg-workspace workspace-grid">
@@ -245,6 +313,11 @@ export function LogsView({
                 selectedId={detailEntry?.id ?? null}
                 onRowClick={setDetailEntry}
                 onRetry={() => setNonce((n) => n + 1)}
+                emptyHint={
+                  testSession
+                    ? "No logs captured in this session yet. Trigger your test flow — new Azure logs will appear here."
+                    : undefined
+                }
               />
             </div>
           </div>

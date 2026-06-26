@@ -30,6 +30,7 @@ interface LogFiltersProps {
   raw: boolean;
   onRawChange: (v: boolean) => void;
   canSeeRaw: boolean;
+  sessionMode?: boolean;
 }
 
 const LEVEL_CHIP: Record<LogLevel, string> = {
@@ -55,6 +56,7 @@ export function LogFilters({
   raw,
   onRawChange,
   canSeeRaw,
+  sessionMode = false,
 }: LogFiltersProps) {
   const maxIdx = TIME_RANGES.indexOf(maxRange);
 
@@ -95,26 +97,30 @@ export function LogFilters({
       </div>
 
       <div className="filter-segment">
-        {TIME_RANGES.map((r, i) => {
-          const disabled = i > maxIdx;
-          const active = timeRange === r;
-          return (
-            <button
-              key={r}
-              type="button"
-              disabled={disabled}
-              onClick={() => onTimeRangeChange(r)}
-              title={disabled ? `Max range for your role: ${maxRange}` : undefined}
-              className={cn(
-                "chip rounded-sm px-2.5",
-                active && "chip-active",
-                disabled && "cursor-not-allowed opacity-35",
-              )}
-            >
-              {TIME_RANGE_LABEL[r]}
-            </button>
-          );
-        })}
+        {sessionMode ? (
+          <span className="chip chip-active cursor-default font-mono text-[10px]">Session window</span>
+        ) : (
+          TIME_RANGES.map((r, i) => {
+            const disabled = i > maxIdx;
+            const active = timeRange === r;
+            return (
+              <button
+                key={r}
+                type="button"
+                disabled={disabled}
+                onClick={() => onTimeRangeChange(r)}
+                title={disabled ? `Max range for your role: ${maxRange}` : undefined}
+                className={cn(
+                  "chip rounded-sm px-2.5",
+                  active && "chip-active",
+                  disabled && "cursor-not-allowed opacity-35",
+                )}
+              >
+                {TIME_RANGE_LABEL[r]}
+              </button>
+            );
+          })
+        )}
       </div>
 
       <div className="hidden h-5 w-px bg-border lg:block" />
