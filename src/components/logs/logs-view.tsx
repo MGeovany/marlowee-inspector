@@ -18,8 +18,6 @@ import {
   TIME_RANGES,
 } from "@/lib/types";
 import {
-  loadTestSession,
-  saveTestSession,
   sessionTimeWindow,
   type TestSession,
 } from "@/lib/test-session";
@@ -32,17 +30,25 @@ import {
   hideLog,
   isLogHidden,
   issueStatusFor,
-  loadIssueStore,
   notesForIssue,
   notesForLog,
   reopenLog,
-  saveIssueStore,
   setIssueStatus,
   shouldSuppressEntry,
   type IssueStatus,
   type IssueStore,
   type NoteTarget,
 } from "@/lib/issues";
+import {
+  fetchStoreInit,
+  setIssueStatusApi,
+  upsertIssueApi,
+  addNoteApi,
+  createSessionApi,
+  updateSessionApi,
+  hideLogEntryApi,
+  reopenLogEntryApi,
+} from "@/lib/api";
 import { LogDetailPanel } from "./log-detail-panel";
 import { LogFilters, type LogStream } from "./log-filters";
 import { LogsHeader } from "./logs-header";
@@ -104,8 +110,18 @@ export function LogsView({
   const [detailEntry, setDetailEntry] = useState<LogEntry | null>(null);
 
   useEffect(() => {
-    setTestSession(loadTestSession());
-    setIssueStoreState(loadIssueStore());
+    fetchStoreInit().then((data) => {
+      setIssueStoreState({
+        issues: data.issues,
+        hiddenLogs: data.hiddenLogs,
+        notes: data.notes,
+      });
+      if (data.activeSession) {
+        setTestSession(data.activeSession);
+      }
+    }).catch(() => {
+      setIssueStoreState(EMPTY_ISSUE_STORE);
+    });
   }, []);
 
   const sessionActive = testSession?.status === "active";
@@ -262,34 +278,63 @@ export function LogsView({
   const detailLogNotes = detailEntry ? notesForLog(issueStore, detailEntry.id) : [];
   const detailLogHidden = detailEntry ? isLogHidden(issueStore, detailEntry) : false;
 
-  function updateIssueStore(next: IssueStore) {
-    setIssueStoreState(next);
-    saveIssueStore(next);
-  }
-
   function handleIssueStatus(entry: LogEntry, status: IssueStatus) {
-    updateIssueStore(setIssueStatus(issueStore, entry, status));
+    const next = setIssueStatus(issueStore, entry, status);
+    setIssueStoreState(next);
+    const fp = buildIssueFingerprint(entry);
+    setIssueStatusApi(fp, status).catch(() => {});
   }
 
   function handleAddNote(entry: LogEntry, target: NoteTarget, text: string) {
-    updateIssueStore(addIssueNote(issueStore, entry, target, text));
+    const next = addIssueNote(issueStore, entry, target, text);
+    setIssueStoreState(next);
+    const fp = buildIssueFingerprint(entry);
+    addNoteApi({
+      target,
+      targetId: target === "issue" ? fp : entry.id,
+      fingerprint: fp,
+      logId: entry.id,
+      text,
+    }).catch(() => {});
   }
 
   function handleHideLog(entry: LogEntry) {
-    updateIssueStore(hideLog(issueStore, entry));
+    const next = hideLog(issueStore, entry);
+    setIssueStoreState(next);
+    const fp = buildIssueFingerprint(entry);
+    hideLogEntryApi({
+      logId: entry.id,
+      fingerprint: fp,
+      app: entry.app,
+      level: entry.level,
+      label: entry.message.slice(0, 96),
+    }).catch(() => {});
   }
 
   function handleReopenLog(logId: string) {
-    updateIssueStore(reopenLog(issueStore, logId));
+    const next = reopenLog(issueStore, logId);
+    setIssueStoreState(next);
+    reopenLogEntryApi(logId).catch(() => {});
   }
 
   function handleSessionChange(session: TestSession | null) {
     setTestSession(session);
-    saveTestSession(session);
     setAllRows([]);
     setDetailEntry(null);
-    if (session?.status === "active") setLive(true);
-    if (session?.status === "stopped") setLive(false);
+    if (session?.status === "active") {
+      setLive(true);
+      createSessionApi({
+        id: session.id,
+        name: session.name,
+        startedAt: session.startedAt,
+      }).catch(() => {});
+    } else if (session?.status === "stopped") {
+      setLive(false);
+      updateSessionApi(session.id, {
+        status: "stopped",
+        stoppedAt: session.stoppedAt,
+      }).catch(() => {});
+    }
     setNonce((n) => n + 1);
   }
 

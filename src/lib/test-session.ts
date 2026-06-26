@@ -8,8 +8,6 @@ export interface TestSession {
   status: TestSessionStatus;
 }
 
-const STORAGE_KEY = "marlowee-inspector:test-session";
-
 export function createTestSession(name: string): TestSession {
   const trimmed = name.trim() || "Untitled test session";
   return {
@@ -26,28 +24,6 @@ export function stopTestSession(session: TestSession): TestSession {
     status: "stopped",
     stoppedAt: new Date().toISOString(),
   };
-}
-
-export function loadTestSession(): TestSession | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = window.sessionStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as TestSession;
-    if (!parsed.id || !parsed.startedAt || !parsed.name) return null;
-    return parsed;
-  } catch {
-    return null;
-  }
-}
-
-export function saveTestSession(session: TestSession | null): void {
-  if (typeof window === "undefined") return;
-  if (!session) {
-    window.sessionStorage.removeItem(STORAGE_KEY);
-    return;
-  }
-  window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(session));
 }
 
 export function sessionTimeWindow(session: TestSession | null): {

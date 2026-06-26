@@ -1,17 +1,11 @@
-/**
- * Structured audit log. Every search (and notable event) is recorded.
- *
- * MVP sink: JSON to stdout, captured by Container Apps -> ContainerAppConsoleLogs_CL under the
- * Marlowee Inspector app. Upgrade path (plan §10/§14): a tamper-evident store (Postgres/Supabase) separate
- * from the workspace being read.
- */
+import { createAuditEvent } from "@/lib/db/repository";
 
 export type AuditEventType = "search" | "raw_search" | "rate_limited" | "denied";
 
 export interface AuditEvent {
   type: AuditEventType;
-  actor: string | null; // UPN / email
-  oid: string | null; // Entra object id
+  actor: string | null;
+  oid: string | null;
   role: string | null;
   app?: string;
   range?: string;
@@ -26,12 +20,25 @@ export interface AuditEvent {
 }
 
 export function audit(event: AuditEvent): void {
-  // Single-line JSON so it is greppable in the log table.
   const record = {
     kind: "marlowee-inspector.audit",
     ts: new Date().toISOString(),
     ...event,
   };
-  // eslint-disable-next-line no-console
+
   console.log(JSON.stringify(record));
+
+  createAuditEvent({
+    type: event.type,
+    actor: event.actor,
+    oid: event.oid,
+    role: event.role,
+    app: event.app,
+    search: event.search,
+    rowCount: event.rowCount,
+    testSessionId: event.testSessionId,
+    details: event.reason ? JSON.stringify({ reason: event.reason }) : undefined,
+  }).catch((err: unknown) => {
+    console.error("Audit DB write failed", err);
+  });
 }

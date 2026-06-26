@@ -10,7 +10,6 @@ import { cn } from "@/lib/utils";
 import {
   createTestSession,
   formatSessionDuration,
-  saveTestSession,
   sessionTimeWindow,
   stopTestSession,
   type TestSession,
@@ -53,7 +52,6 @@ export function TestSessionBar({
 
   function handleStart() {
     const next = createTestSession(name);
-    saveTestSession(next);
     onSessionChange(next);
     onTestSessionIdFilterChange("");
     setName("");
@@ -62,12 +60,10 @@ export function TestSessionBar({
   function handleStop() {
     if (!session) return;
     const stopped = stopTestSession(session);
-    saveTestSession(stopped);
     onSessionChange(stopped);
   }
 
   function handleEndSession() {
-    saveTestSession(null);
     onSessionChange(null);
     onTestSessionIdFilterChange("");
   }

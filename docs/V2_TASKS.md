@@ -1,63 +1,71 @@
 # Marlowee Inspector — V2 Tasks
 
+Status: ✅ Implementado
+
 ---
 
 ## Persistencia: SQLite local (sin Postgres)
 
-Solo SQLite con Drizzle ORM. Nada de Postgres, Neon, Supabase ni Azure Flexible Server por ahora.
+Solo SQLite con Drizzle ORM. Nada de Postgres, Neon, Supabase ni Azure Flexible Server.
 
-### 1. Dependencias
+### ✅ Dependencias instaladas
 
 ```
 pnpm add drizzle-orm better-sqlite3
 pnpm add -D drizzle-kit @types/better-sqlite3
 ```
 
-### 2. Archivos nuevos
+### ✅ Archivos creados
 
 | Archivo | Propósito |
 |---------|-----------|
-| `src/lib/db/schema.ts` | Schema Drizzle con las 5 tablas |
-| `src/lib/db/client.ts` | `createClient()` — solo SQLite |
-| `src/lib/db/repository.ts` | Funciones CRUD que reemplazan `loadIssueStore/saveIssueStore` |
+| `drizzle.config.ts` | Configuración de drizzle-kit |
+| `src/lib/db/schema.ts` | Schema Drizzle con 5 tablas + hidden_logs |
+| `src/lib/db/client.ts` | `createClient()` — SQLite local vía better-sqlite3 |
+| `src/lib/db/repository.ts` | CRUD completo para todas las tablas |
+| `src/lib/api.ts` | Cliente fetch para los endpoints |
 
-### 3. Database location
+### ✅ Database location
 
 | Uso | Ruta |
 |-----|------|
-| Desarrollo | `./data/marlowee.db` |
-| Uso real local | `~/.marlowee-inspector/marlowee.db` vía env `MARLOWEE_DB_PATH` |
+| Default dev | `./data/marlowee.db` |
+| Con env var | `MARLOWEE_DB_PATH=/ruta/personalizada/marlowee.db` |
 
-Agregar `/data` a `.gitignore`.
-
-### 4. Tablas
+### ✅ Tablas creadas
 
 - `test_sessions`
 - `issue_fingerprints`
+- `hidden_logs` (por logId, no por fingerprint)
 - `log_annotations`
 - `suppress_rules`
 - `audit_events`
 
-### 5. Endpoints REST
+### ✅ Endpoints REST
 
-| Endpoint | Descripción |
-|----------|-------------|
-| `GET/POST /api/issues` | Listar / crear issue fingerprints |
-| `PATCH /api/issues/:fingerprint` | Cambiar status |
-| `GET/POST /api/annotations` | Notas |
-| `GET/POST /api/sessions` | Test sessions |
-| `PATCH /api/sessions/:id` | Detener / renombrar session |
-| `GET /api/audit` | Solo Admin |
-| `GET/POST /api/suppressions` | Reglas de supresión |
+| Endpoint | Métodos |
+|----------|---------|
+| `/api/store/init` | GET — estado completo (issues + hidden + notes + activeSession + suppressions) |
+| `/api/issues` | GET, POST |
+| `/api/issues/:fingerprint` | GET, PATCH |
+| `/api/annotations` | GET, POST |
+| `/api/hidden` | GET, POST |
+| `/api/hidden/:logId` | DELETE |
+| `/api/sessions` | GET, POST |
+| `/api/sessions/:id` | PATCH |
+| `/api/suppressions` | GET, POST |
+| `/api/suppressions/:id` | DELETE |
+| `/api/audit` | GET (Admin only) |
 
-### 6. Migrar UI
+### ✅ UI migrada
 
-- Reemplazar `loadIssueStore`/`saveIssueStore` (localStorage)
-- Usar `fetch()` a los endpoints internos
-- Eliminar `STORAGE_KEY` de `issues.ts`
-- Eliminar `sessionStorage` de `test-session.ts`
+- `logs-view.tsx` — carga estado via `/api/store/init`, mutations via fetch
+- `issues.ts` — eliminados `loadIssueStore`/`saveIssueStore` (localStorage), solo quedan funciones puras
+- `test-session.ts` — eliminados `loadTestSession`/`saveTestSession` (sessionStorage)
+- `test-session-bar.tsx` — ya no guarda en sessionStorage, delega al parent
+- `audit.ts` — escribe a SQLite además de stdout
 
-### 7. Scripts npm
+### ✅ Scripts npm
 
 ```json
 "db:push": "drizzle-kit push",
@@ -65,7 +73,17 @@ Agregar `/data` a `.gitignore`.
 "db:studio": "drizzle-kit studio"
 ```
 
-### 8. Flujo local
+### ✅ .gitignore
+
+`/data/` y `*.db` agregados.
+
+### ✅ Build
+
+`pnpm typecheck`, `pnpm build`, `pnpm test` pasan.
+
+---
+
+## Flujo local
 
 ```bash
 git clone <repo>
@@ -95,26 +113,10 @@ Luego abrir `http://localhost:3000`.
 
 ---
 
-## Auth se mantiene igual
-
-Aunque sea local-only, cada dev necesita:
-
-1. **Login en Marlowee** via Microsoft Entra ID (saber quién es y qué rol tiene)
-2. **Permiso para Azure** via `az login` y `DefaultAzureCredential` (leer Log Analytics)
-
-No es lo más elegante, pero es lo más simple y seguro para una herramienta local interna.
-
----
-
-## Copy raw / Copy for AI
+## Copy raw / Copy for AI (pendiente)
 
 - [ ] Crear `POST /api/logs/copy` endpoint que recibe `{ logId }`, aplica masking, registra audit `raw_copied`, devuelve texto masked
 - [ ] Conectar botón "Copy raw" y "Copy for AI" en `LogDetailPanel` al nuevo endpoint
-
-## Audit durable
-
-- [ ] Migrar audit de stdout JSON a la tabla `audit_events` (mantener mirror a stdout como respaldo)
-- [ ] UI de auditoría para Admin (`GET /api/audit` con filtros por actor, tipo, rango de fechas)
 
 ## Parsers por app (opcional)
 

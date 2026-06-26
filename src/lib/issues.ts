@@ -59,34 +59,11 @@ export interface HiddenLogSummary {
   notesCount: number;
 }
 
-const STORAGE_KEY = "marlowee-inspector.issue-state.v1";
-
 export const EMPTY_ISSUE_STORE: IssueStore = {
   issues: {},
   hiddenLogs: {},
   notes: [],
 };
-
-export function loadIssueStore(): IssueStore {
-  if (typeof window === "undefined") return EMPTY_ISSUE_STORE;
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return EMPTY_ISSUE_STORE;
-    const parsed = JSON.parse(raw) as Partial<IssueStore>;
-    return {
-      issues: parsed.issues ?? {},
-      hiddenLogs: parsed.hiddenLogs ?? {},
-      notes: parsed.notes ?? [],
-    };
-  } catch {
-    return EMPTY_ISSUE_STORE;
-  }
-}
-
-export function saveIssueStore(store: IssueStore): void {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
-}
 
 export function buildIssueFingerprint(entry: LogEntry): string {
   const details = extractLogDetails(entry, true);
