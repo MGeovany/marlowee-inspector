@@ -5,6 +5,7 @@ import { format } from "date-fns";
 import { RotateCcw, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { SegmentControl } from "@/components/ui/segment-control";
 import { IssueStatusBadge } from "@/components/logs/issue-status-badge";
 import { LevelBadge } from "@/components/logs/level-badge";
@@ -38,6 +39,8 @@ export function HiddenSuppressedView({
   const [suppressedIssues, setSuppressedIssues] = useState<IssueRecord[]>([]);
   const [rules, setRules] = useState<SuppressionRule[]>([]);
   const [loading, setLoading] = useState(true);
+  const [ruleToDelete, setRuleToDelete] = useState<SuppressionRule | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -69,11 +72,16 @@ export function HiddenSuppressedView({
     await load();
   }
 
-  async function removeRule(id: string) {
-    const ok = window.confirm("Delete this suppression rule?");
-    if (!ok) return;
-    await deleteSuppressionApi(id);
-    await load();
+  async function confirmRemoveRule() {
+    if (!ruleToDelete) return;
+    setDeleting(true);
+    try {
+      await deleteSuppressionApi(ruleToDelete.id);
+      setRuleToDelete(null);
+      await load();
+    } finally {
+      setDeleting(false);
+    }
   }
 
   return (
@@ -213,7 +221,7 @@ export function HiddenSuppressedView({
                       size="sm"
                       variant="ghost"
                       className="text-level-error"
-                      onClick={() => void removeRule(rule.id)}
+                      onClick={() => setRuleToDelete(rule)}
                     >
                       <Trash2 className="h-3 w-3" />
                     </Button>
@@ -224,6 +232,26 @@ export function HiddenSuppressedView({
           </DataTable>
         )}
       </section>
+
+      <ConfirmDialog
+        open={ruleToDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setRuleToDelete(null);
+        }}
+        title="Delete suppression rule?"
+        description={
+          ruleToDelete ? (
+            <>
+              Logs matching{" "}
+              <code className="break-all text-fg">{ruleToDelete.pattern}</code> will no longer
+              be suppressed. This can’t be undone.
+            </>
+          ) : null
+        }
+        confirmLabel="Delete rule"
+        busy={deleting}
+        onConfirm={confirmRemoveRule}
+      />
     </TriagePageShell>
   );
 }

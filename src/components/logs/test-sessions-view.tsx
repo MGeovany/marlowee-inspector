@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { format } from "date-fns";
 import { useRouter } from "next/navigation";
 import {
+  BarChart3,
   ChevronRight,
   Copy,
   Pencil,
@@ -16,8 +17,10 @@ import {
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { LogsSidebar } from "@/components/logs/logs-sidebar";
+import { SessionDetailView } from "@/components/logs/session-detail-view";
 import { cn } from "@/lib/utils";
 import {
   createSessionApi,
@@ -53,6 +56,9 @@ export function TestSessionsView({
   const [editName, setEditName] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
+  const [sessionToDelete, setSessionToDelete] = useState<TestSession | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [selectedSession, setSelectedSession] = useState<TestSession | null>(null);
 
   const loadSessions = useCallback(async () => {
     setLoading(true);
@@ -113,13 +119,16 @@ export function TestSessionsView({
     await loadSessions();
   }
 
-  async function handleDelete(session: TestSession) {
-    const ok = window.confirm(
-      `Delete session "${session.name}"? This only removes Marlowee metadata — Azure logs are unchanged.`,
-    );
-    if (!ok) return;
-    await deleteSessionApi(session.id);
-    await loadSessions();
+  async function confirmDelete() {
+    if (!sessionToDelete) return;
+    setDeleting(true);
+    try {
+      await deleteSessionApi(sessionToDelete.id);
+      setSessionToDelete(null);
+      await loadSessions();
+    } finally {
+      setDeleting(false);
+    }
   }
 
   function openInLiveLogs(session: TestSession) {
@@ -130,6 +139,18 @@ export function TestSessionsView({
     await navigator.clipboard.writeText(id);
     setCopiedId(id);
     window.setTimeout(() => setCopiedId(null), 1500);
+  }
+
+  if (selectedSession) {
+    return (
+      <SessionDetailView
+        session={selectedSession}
+        role={role}
+        userEmail={userEmail}
+        signOutAction={signOutAction}
+        onBack={() => setSelectedSession(null)}
+      />
+    );
   }
 
   return (
@@ -266,9 +287,10 @@ export function TestSessionsView({
                           setEditingId(null);
                           setEditName("");
                         }}
+                        onView={() => setSelectedSession(session)}
                         onOpen={() => openInLiveLogs(session)}
                         onStop={() => void handleStop(session)}
-                        onDelete={() => void handleDelete(session)}
+                        onDelete={() => setSessionToDelete(session)}
                         onCopyId={() => void copySessionId(session.id)}
                       />
                     ))}
@@ -279,6 +301,25 @@ export function TestSessionsView({
           </section>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={sessionToDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setSessionToDelete(null);
+        }}
+        title="Delete test session?"
+        description={
+          sessionToDelete ? (
+            <>
+              Deleting <span className="font-medium text-fg">{sessionToDelete.name}</span> only
+              removes Marlowee metadata — your Azure logs are unchanged.
+            </>
+          ) : null
+        }
+        confirmLabel="Delete session"
+        busy={deleting}
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 }
@@ -293,6 +334,7 @@ function SessionRow({
   onEditNameChange,
   onEditSave,
   onEditCancel,
+  onView,
   onOpen,
   onStop,
   onDelete,
@@ -307,6 +349,7 @@ function SessionRow({
   onEditNameChange: (value: string) => void;
   onEditSave: () => void;
   onEditCancel: () => void;
+  onView: () => void;
   onOpen: () => void;
   onStop: () => void;
   onDelete: () => void;
@@ -337,7 +380,13 @@ function SessionRow({
           </div>
         ) : (
           <div className="flex items-center gap-1.5">
-            <span className="truncate text-fg">{session.name}</span>
+            <button
+              type="button"
+              onClick={onView}
+              className="truncate text-fg hover:text-accent-bright hover:underline"
+            >
+              {session.name}
+            </button>
             <button
               type="button"
               onClick={onEditStart}
@@ -378,6 +427,10 @@ function SessionRow({
       </td>
       <td className="px-3 py-2.5">
         <div className="flex flex-wrap items-center justify-end gap-1.5">
+          <Button size="sm" variant="outline" onClick={onView}>
+            <BarChart3 className="h-3 w-3" />
+            Details
+          </Button>
           <Button size="sm" variant="outline" onClick={onOpen}>
             <Radio className="h-3 w-3" />
             Open

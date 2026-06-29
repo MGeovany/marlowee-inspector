@@ -409,6 +409,41 @@
     @apply bg-[rgba(255,255,255,0.04)] text-fg-subtle;
   }
 
+  .modal-overlay-in {
+    animation: modal-overlay-in 150ms ease-out;
+  }
+
+  .modal-panel-in {
+    animation: modal-panel-in 160ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  @keyframes modal-overlay-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes modal-panel-in {
+    from {
+      opacity: 0;
+      transform: translateY(6px) scale(0.97);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .modal-overlay-in,
+    .modal-panel-in {
+      animation: none;
+    }
+  }
+
   .live-dot {
     @apply inline-block h-1.5 w-1.5 rounded-full bg-[var(--green)] shadow-[0_0_6px_rgba(0,217,115,0.55)];
     animation: live-pulse 2s ease-in-out infinite;

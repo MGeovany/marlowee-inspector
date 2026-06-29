@@ -1,6 +1,6 @@
 import type { IssueStatus, IssueStore, IssueRecord, HiddenLogRecord, IssueNote } from "./issues";
 import type { TestSession } from "./test-session";
-import type { ContainerApp, LogLevel } from "./types";
+import type { ContainerApp, LogLevel, LogsSummaryResponse } from "./types";
 
 export interface StoreInitResponse extends IssueStore {
   activeSession: TestSession | null;
@@ -90,6 +90,19 @@ export async function fetchSessionsApi(): Promise<SessionsResponse> {
 
 export async function deleteSessionApi(id: string): Promise<void> {
   await fetch(`/api/sessions/${id}`, { method: "DELETE" });
+}
+
+/** Aggregated log/error breakdown scoped to a test session's time window. */
+export async function fetchSessionSummaryApi(
+  session: TestSession,
+): Promise<LogsSummaryResponse> {
+  const params = new URLSearchParams({ since: session.startedAt });
+  if (session.status === "stopped" && session.stoppedAt) {
+    params.set("until", session.stoppedAt);
+  }
+  const res = await fetch(`/api/logs/summary?${params.toString()}`);
+  if (!res.ok) throw new Error("Failed to load session summary");
+  return res.json();
 }
 
 export async function hideLogEntryApi(data: {
