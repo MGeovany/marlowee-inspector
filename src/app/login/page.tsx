@@ -19,7 +19,7 @@ export default function LoginPage() {
               priority
             />
           </div>
-          <h1 className="font-heading text-xl font-semibold text-fg">Marlowee Inspector</h1>
+          <h1 className="font-heading text-xl font-semibold text-fg">Savvly Inspector</h1>
           <p className="mt-1 text-[12px] text-fg-subtle">
             Internal log viewer · Savvly dev workspace
           </p>

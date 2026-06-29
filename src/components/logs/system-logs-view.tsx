@@ -10,6 +10,7 @@ import { LogDetailPanel } from "@/components/logs/log-detail-panel";
 import { LogFilters } from "@/components/logs/log-filters";
 import { LogsSidebar, type AppSelection } from "@/components/logs/logs-sidebar";
 import { LogsTable, type LogsStatus } from "@/components/logs/logs-table";
+import { useNewRowIds } from "@/hooks/use-new-row-ids";
 import { filterLogRows, relatedLogs } from "@/lib/log-stats";
 import { buildIssueFingerprint, issueStatusFor, notesForIssue, notesForLog } from "@/lib/issues";
 import { fetchStoreInit } from "@/lib/api";
@@ -146,6 +147,12 @@ export function SystemLogsView({
     [allRows, selectedApp, search, level],
   );
 
+  const querySig = useMemo(
+    () => [appsToFetch.join(","), timeRange, level, search].join("|"),
+    [appsToFetch, timeRange, level, search],
+  );
+  const newIds = useNewRowIds(allRows, querySig, status === "success");
+
   const related = useMemo(
     () => (detailEntry ? relatedLogs(detailEntry, allRows) : []),
     [detailEntry, allRows],
@@ -233,6 +240,7 @@ export function SystemLogsView({
             selectedId={detailEntry?.id ?? null}
             onRowClick={setDetailEntry}
             onRetry={() => setNonce((n) => n + 1)}
+            newIds={newIds}
             emptyHint="No system log events in this window"
           />
         </div>

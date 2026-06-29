@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useErrorNotifications } from "@/hooks/use-error-notifications";
+import { useNewRowIds } from "@/hooks/use-new-row-ids";
+import { useTitleBadge } from "@/hooks/use-title-badge";
 import {
   filterLogRows,
   relatedLogs,
@@ -273,6 +275,25 @@ export function LogsView({
     [visibleRows, selectedApp, search, level, stream],
   );
 
+  // Signature of the server-side query — when it changes the row baseline resets
+  // instead of flashing every row as new.
+  const querySig = useMemo(
+    () =>
+      [
+        timeRange,
+        stream,
+        level,
+        search,
+        testSession?.id ?? "",
+        testSession?.startedAt ?? "",
+        requestIdFilter,
+        testSessionIdFilter,
+      ].join("|"),
+    [timeRange, stream, level, search, testSession?.id, testSession?.startedAt, requestIdFilter, testSessionIdFilter],
+  );
+
+  const newIds = useNewRowIds(allRows, querySig, status === "success");
+
   const errorNotifyResetKey = useMemo(
     () =>
       [
@@ -299,12 +320,14 @@ export function LogsView({
     ],
   );
 
-  useErrorNotifications({
+  const { newCount: notificationCount, clearNotifications } = useErrorNotifications({
     rows: allRows,
     enabled: live && status === "success",
     resetKey: errorNotifyResetKey,
     onView: setDetailEntry,
   });
+
+  useTitleBadge(notificationCount);
 
   const sidePanel = useMemo(() => summaryToSidePanel(summary), [summary]);
   const resolvedIssues = useMemo(
@@ -433,6 +456,8 @@ export function LogsView({
           loading={status === "loading"}
           masked={masked}
           testSession={testSession}
+          notificationCount={notificationCount}
+          onClearNotifications={clearNotifications}
         />
 
         <TestSessionBar
@@ -449,7 +474,7 @@ export function LogsView({
         <LogsSummaryCards
           summary={summary}
           sparklines={cardSparklines}
-          loading={status === "loading" || summaryLoading}
+          loading={(status === "loading" || summaryLoading) && !summary}
           live={live && sessionActive}
           sessionActive={Boolean(testSession)}
         />
@@ -481,6 +506,7 @@ export function LogsView({
                 selectedId={detailEntry?.id ?? null}
                 onRowClick={setDetailEntry}
                 onRetry={() => setNonce((n) => n + 1)}
+                newIds={newIds}
                 emptyHint={
                   testSession
                     ? "No logs captured in this session yet. Trigger your test flow — new Azure logs will appear here."

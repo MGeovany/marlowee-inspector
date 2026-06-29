@@ -26,7 +26,7 @@ const spaceMono = Space_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Marlowee Inspector",
+  title: "Savvly Inspector",
   description: "Internal log inspector for Savvly container apps",
 };
 

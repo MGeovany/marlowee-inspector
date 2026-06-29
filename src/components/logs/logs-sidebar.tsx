@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
+import Link, { useLinkStatus } from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Archive,
@@ -11,6 +11,7 @@ import {
   KeyRound,
   Layers,
   ListChecks,
+  Loader2,
   LogOut,
   MessageSquareText,
   Radio,
@@ -88,7 +89,7 @@ export function LogsSidebar({ userEmail, role, signOutAction }: LogsSidebarProps
           </div>
           <div className="min-w-0">
             <p className="truncate font-heading text-[15px] font-semibold leading-tight text-fg">
-              Marlowee
+              Savvly
             </p>
             <p className="text-[11px] text-fg-subtle">Inspector · Development</p>
           </div>
@@ -105,7 +106,7 @@ export function LogsSidebar({ userEmail, role, signOutAction }: LogsSidebarProps
               <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-fg-subtle">
                 {section.title}
               </p>
-              <div className="space-y-0.5">
+              <div className="space-y-1.5">
                 {items.map((item) => (
                   <NavItem key={item.label} item={item} pathname={pathname} />
                 ))}
@@ -168,18 +169,36 @@ function NavItem({ item, pathname }: { item: NavItemDef; pathname: string }) {
       aria-current={active ? "page" : undefined}
       className={cn("sidebar-nav-item", active && "sidebar-nav-item-active", !active && "text-fg-muted")}
     >
-      <span
-        className={cn(
-          "sidebar-nav-icon",
-          active ? "sidebar-nav-icon-active" : "sidebar-nav-icon-idle",
-        )}
-      >
-        <Icon className="h-3.5 w-3.5" />
-      </span>
+      <NavIcon Icon={Icon} active={active} />
       <span className={cn("flex-1 text-[13px] leading-none", active ? "font-semibold text-fg" : "font-medium")}>
         {item.label}
       </span>
     </Link>
+  );
+}
+
+/**
+ * Icon for a nav link. Swaps to a spinner while the route is navigating —
+ * `useLinkStatus` reports the parent <Link>'s pending state (Next 15.3+).
+ */
+function NavIcon({
+  Icon,
+  active,
+}: {
+  Icon: React.ComponentType<{ className?: string }>;
+  active: boolean;
+}) {
+  const { pending } = useLinkStatus();
+  return (
+    <span
+      className={cn("sidebar-nav-icon", active ? "sidebar-nav-icon-active" : "sidebar-nav-icon-idle")}
+    >
+      {pending ? (
+        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+      ) : (
+        <Icon className="h-3.5 w-3.5" />
+      )}
+    </span>
   );
 }
 

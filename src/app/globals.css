@@ -360,6 +360,31 @@
     @apply bg-[rgba(242,77,77,0.12)];
   }
 
+  .obs-row-new {
+    animation: row-flash-in 2.4s ease-out;
+  }
+
+  @keyframes row-flash-in {
+    0% {
+      background-color: var(--accent-soft);
+      box-shadow: inset 2px 0 0 var(--accent-bright);
+    }
+    70% {
+      background-color: var(--accent-soft);
+      box-shadow: inset 2px 0 0 var(--accent-bright);
+    }
+    100% {
+      background-color: transparent;
+      box-shadow: inset 2px 0 0 transparent;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .obs-row-new {
+      animation: none;
+    }
+  }
+
   .status-pill {
     @apply inline-flex items-center rounded-sm px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.02em];
   }

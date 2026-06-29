@@ -19,6 +19,7 @@ interface LogsTableProps {
   onRowClick: (entry: LogEntry) => void;
   onRetry: () => void;
   emptyHint?: string;
+  newIds?: ReadonlySet<string>;
 }
 
 const STATUS_PILL: Record<LogLevel, string> = {
@@ -38,9 +39,14 @@ export function LogsTable({
   onRowClick,
   onRetry,
   emptyHint,
+  newIds,
 }: LogsTableProps) {
-  if (status === "loading") return <LoadingState />;
-  if (status === "error") return <ErrorState message={error} onRetry={onRetry} />;
+  // Skeleton only on the very first load (no data yet). Background refreshes
+  // keep the current rows visible and flag new ones via `newIds`.
+  if (status === "loading" && rows.length === 0) return <LoadingState />;
+  if (status === "error" && rows.length === 0) {
+    return <ErrorState message={error} onRetry={onRetry} />;
+  }
   if (status === "success" && rows.length === 0) {
     return <EmptyState timeRange={timeRange} hint={emptyHint} />;
   }
@@ -69,6 +75,7 @@ export function LogsTable({
                 "obs-row cursor-pointer",
                 selectedId === row.id && "obs-row-selected",
                 row.level === "ERROR" && "obs-row-error",
+                newIds?.has(row.id) && "obs-row-new",
               )}
             >
               <Td mono muted>

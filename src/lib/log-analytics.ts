@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import { DefaultAzureCredential } from "@azure/identity";
 import { Durations, LogsQueryClient, LogsQueryResultStatus } from "@azure/monitor-query";
 import type { TimeRange } from "./authz";
@@ -73,23 +75,39 @@ export async function queryLogs(kql: string, range: TimeRange): Promise<LogEntry
     return value instanceof Date ? value.toISOString() : stringifyCell(value);
   };
 
-  return table.rows.map((row, i) => {
+  // A row's identity must be stable across polls. Using the positional index
+  // is NOT stable: Log Analytics doesn't guarantee row order between identical
+  // queries (and any new row shifts every index), so the same log would get a
+  // fresh id each fetch and re-trigger "new error" notifications. Derive the id
+  // from content instead, with a per-fetch counter only to disambiguate rows
+  // that are byte-for-byte identical at the same timestamp.
+  const occurrences = new Map<string, number>();
+  return table.rows.map((row) => {
     const timestamp = timestampAt(row, cTime);
     const streamRaw = at(row, cStream).toLowerCase();
     const stream: LogEntry["stream"] =
       streamRaw === "stderr" ? "stderr" : streamRaw === "system" ? "system" : "stdout";
     const message = at(row, cMsg);
     const app = at(row, cApp) as ContainerApp;
+    const revision = at(row, cRev);
+    const replica = at(row, cReplica);
+    const rawPayload = at(row, cRaw) || message;
+    const contentKey = `${app}:${timestamp}:${revision}:${replica}:${stream}:${createHash("sha1")
+      .update(rawPayload)
+      .digest("hex")
+      .slice(0, 16)}`;
+    const seen = occurrences.get(contentKey) ?? 0;
+    occurrences.set(contentKey, seen + 1);
     const entry: LogEntry = {
-      id: `${app}:${at(row, cRev)}:${at(row, cReplica)}:${i}:${timestamp}`,
+      id: seen === 0 ? contentKey : `${contentKey}#${seen}`,
       timestamp,
       app,
       level: normalizeLevel(at(row, cLevel) || "LOG"),
       message,
-      revision: at(row, cRev),
-      replica: at(row, cReplica),
+      revision,
+      replica,
       stream,
-      rawPayload: at(row, cRaw) || message,
+      rawPayload,
     };
     // Per-app parser refines level from JSON payload and extracts extra fields
     const parsed = parseLog(entry);

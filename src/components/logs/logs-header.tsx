@@ -1,7 +1,7 @@
 "use client";
 
 import { format } from "date-fns";
-import { ChevronRight, Pause, Play, RefreshCw } from "lucide-react";
+import { Bell, ChevronRight, Pause, Play, RefreshCw } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,8 @@ interface LogsHeaderProps {
   loading: boolean;
   masked: boolean;
   testSession?: TestSession | null;
+  notificationCount?: number;
+  onClearNotifications?: () => void;
 }
 
 export function LogsHeader({
@@ -26,6 +28,8 @@ export function LogsHeader({
   loading,
   masked,
   testSession,
+  notificationCount = 0,
+  onClearNotifications,
 }: LogsHeaderProps) {
   return (
     <header className="glass-header shrink-0">
@@ -40,6 +44,17 @@ export function LogsHeader({
         </div>
 
         <div className="flex items-center gap-2">
+          {notificationCount > 0 && (
+            <button
+              type="button"
+              onClick={onClearNotifications}
+              title="Clear all notifications"
+              className="relative flex h-8 items-center gap-1.5 rounded-md border border-[rgba(242,77,77,0.3)] bg-[rgba(242,77,77,0.1)] px-2 text-[11px] font-semibold text-[#ff8a8a] transition-colors hover:bg-[rgba(242,77,77,0.18)]"
+            >
+              <Bell className="h-3.5 w-3.5" />
+              <span className="tabular-nums">{notificationCount > 99 ? "99+" : notificationCount}</span>
+            </button>
+          )}
           {testSession && (
             <Badge variant={testSession.status === "active" ? "success" : "neutral"}>
               {testSession.status === "active" && <span className="live-dot mr-1" />}

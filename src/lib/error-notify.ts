@@ -69,21 +69,31 @@ export function clearAllErrorNotifications(): void {
   toast.dismiss();
 }
 
+function receivedAt(): string {
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
 export function notifyNewErrors(
   entries: LogEntry[],
   onView?: (entry: LogEntry) => void,
+  onClearAll: () => void = clearAllErrorNotifications,
 ): void {
   if (entries.length === 0) return;
 
   playErrorAlertSound();
 
+  const at = receivedAt();
   const sorted = [...entries].sort((a, b) => b.timestamp.localeCompare(a.timestamp));
   const visible = sorted.slice(0, 3);
 
   for (const entry of visible) {
     toast.error(`New error · ${entry.app}`, {
       id: `error-${entry.id}`,
-      description: truncateMessage(entry.message),
+      // Prefix with the wall-clock time the alert fired, so repeated/identical
+      // errors are still distinguishable by when they arrived.
+      description: `${at} · ${truncateMessage(entry.message)}`,
       duration: Infinity,
       action: onView
         ? {
@@ -97,23 +107,20 @@ export function notifyNewErrors(
     });
   }
 
+  // Single summary toast: total count + the time received + Clear all. (Avoids
+  // the redundant "N more" + "N new errors" pair that showed before.)
   const remaining = sorted.length - visible.length;
-  if (remaining > 0) {
-    toast.message(`${remaining} more new error${remaining === 1 ? "" : "s"}`, {
-      id: `error-batch-${sorted[0]?.id ?? "batch"}`,
-      duration: Infinity,
-    });
-  }
+  const summary =
+    remaining > 0
+      ? `${sorted.length} new errors (+${remaining} hidden) · ${at}`
+      : `${sorted.length} new error${sorted.length === 1 ? "" : "s"} · ${at}`;
 
-  toast.message(
-    `${sorted.length} new error${sorted.length === 1 ? "" : "s"}`,
-    {
-      id: "error-clear-all",
-      duration: Infinity,
-      action: {
-        label: "Clear all",
-        onClick: clearAllErrorNotifications,
-      },
+  toast.message(summary, {
+    id: "error-clear-all",
+    duration: Infinity,
+    action: {
+      label: "Clear all",
+      onClick: onClearAll,
     },
-  );
+  });
 }

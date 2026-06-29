@@ -87,13 +87,17 @@ export function OverviewView({
         setCardSparklines(null);
       }
 
-      setAppSnapshots(
-        allowedApps.map((app) => ({
-          app,
-          summary: null,
-          sparkline: [],
-          loading: true,
-        })),
+      // Only show placeholders on the first load; on refresh keep the previous
+      // values visible until the new ones arrive (no flicker).
+      setAppSnapshots((prev) =>
+        prev.length === 0
+          ? allowedApps.map((app) => ({
+              app,
+              summary: null,
+              sparkline: [],
+              loading: true,
+            }))
+          : prev,
       );
 
       const perApp = await Promise.all(
@@ -172,7 +176,7 @@ export function OverviewView({
           <LogsSummaryCards
             summary={summary}
             sparklines={cardSparklines}
-            loading={loading}
+            loading={loading && !summary}
             live={false}
           />
 
